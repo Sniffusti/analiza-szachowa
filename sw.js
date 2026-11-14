@@ -1,6 +1,6 @@
 // Service worker: aplikacja działa offline (np. na iPhonie z ekranu początkowego).
 // Pliki aplikacji: najpierw sieć, w razie braku – pamięć podręczna. API zawsze z sieci.
-const CACHE = 'analiza-v5';
+const CACHE = 'analiza-v6';
 const PRECACHE = [
   './', 'index.html', 'style.css', 'app.js', 'engine.js', 'classify.js', 'pgn.js', 'db-worker.js',
   'manifest.webmanifest', 'icon-180.png', 'favicon.png', 'logo.png', 'icon-192.png', 'icon-512.png',

@@ -48,16 +48,66 @@ function playOn(fen, uci) {
 let current = null; // aktywne ćwiczenie {kind, resume()}
 
 export function onShowTab(name) {
-  if (name === 'train' && current?.kind === 'puzzle') current.resume();
+  if (name === 'puzzles' && current?.kind === 'puzzle') current.resume();
+  if (name === 'puzzles' && !current && !$('train-pzhome').hidden) renderPzHome();
+  if (name === 'train') renderTutorReport();
 }
+/** Wejście z zewnątrz (strona główna): otwiera Zadania w danym trybie. */
+export function openPuzzles(mode) {
+  A.showTab('puzzles');
+  if (mode === 'daily') { setSub('puzzles'); return runDaily(); }
+  setSub(mode);
+  if (mode === 'puzzles' && !current) nextLichessPuzzle();
+  if (mode === 'mistakes') nextMistake();
+}
+async function runDaily() {
+  const box = $('pz-box');
+  box.innerHTML = '<p class="muted">Pobieram zadanie dnia…</p>';
+  let data;
+  try {
+    const c = A.store.get('daily', null);
+    data = c && c.key === new Date().toISOString().slice(0, 10) ? c.data : await (await fetch('https://lichess.org/api/puzzle/daily', { headers: { Accept: 'application/json' } })).json();
+  } catch (e) { box.innerHTML = `<p class="muted">Brak połączenia (${esc(e.message)}).</p>`; return; }
+  const c = new Chess(); let last = null;
+  for (const san of data.game.pgn.split(' ')) { try { last = c.move(san); } catch { break; } }
+  runPuzzle({ fen: c.fen(), sol: data.puzzle.solution, lastMove: last ? [last.from, last.to] : null,
+    title: `★ Zadanie dnia · ranking ${data.puzzle.rating}`, onDone(ok) { if (ok) A.markActive?.(); }, next: nextLichessPuzzle }, 'pz-box');
+}
+
+// ---------------------------------------------------------------- kafelki zadań
+const TILE_THEMES = [['mateIn1', '♚', 'Mat w 1'], ['mateIn2', '♛', 'Mat w 2'], ['fork', '⑂', 'Widełki'], ['pin', '📌', 'Związanie'], ['skewer', '➶', 'Przeszycie'], ['hangingPiece', '◌', 'Wisząca figura'],
+  ['discoveredAttack', '⇄', 'Odsłonięty atak'], ['sacrifice', '✶', 'Poświęcenie'], ['backRankMate', '▁', 'Mat na ostatniej linii'], ['promotion', '♕', 'Promocja'], ['endgame', '♔', 'Końcówka'], ['defensiveMove', '⛨', 'Obrona']];
+async function renderPzHome() {
+  const s = pzStats();
+  const mistakes = await getMistakes();
+  const due = mistakes.filter((m) => m.due <= Date.now()).length;
+  const best = A.store.get('rushBest', {});
+  $('train-pzhome').innerHTML = `
+    <div class="pz-hero">
+      <div><small class="eyebrow" style="margin:0">Ranking zadań</small><div class="pz-big mono">${s.rating}</div><div class="muted">rozwiązane ${s.solved} · nieudane ${s.failed} · seria ${s.streak}</div></div>
+      <button class="btn primary big" data-pz="puzzles" style="width:auto;padding:12px 26px">Rozwiązuj zadania</button>
+    </div>
+    <div class="pz-tiles">
+      <button class="pz-tile t1" data-pz="puzzles"><b>✦</b><span>Zadania</span><small>z rankingiem ${s.rating}</small></button>
+      <button class="pz-tile t2" data-pz="rush"><b>⚡</b><span>Puzzle Rush</span><small>rekord ${Math.max(best['3'] || 0, best['5'] || 0, best.survival || 0)}</small></button>
+      <button class="pz-tile t3" data-pz="mistakes"><b>✕</b><span>Moje błędy</span><small>${due} do powtórki</small></button>
+      <button class="pz-tile t4" data-pz="daily"><b>★</b><span>Zadanie dnia</span><small>codziennie nowe</small></button>
+    </div>
+    <h3>Motywy</h3>
+    <div class="theme-tiles">${TILE_THEMES.map(([k, g, n]) => `<button class="theme-tile" data-theme="${k}"><b>${g}</b><span>${n}</span></button>`).join('')}
+      <button class="theme-tile" data-pz="puzzles"><b>⋯</b><span>Wszystkie motywy</span></button></div>`;
+  fx.enter($('train-pzhome').querySelectorAll('.pz-hero, .pz-tile, .theme-tile'), { step: 22 });
+}
+
 export const drills = {
   show() { renderRepList(); if (current?.kind === 'drill' && !$('drill-box').hidden) current.resume(); },
 };
 
 function setSub(sub) {
   for (const b of $('train-sub').children) b.classList.toggle('active', b.dataset.sub === sub);
-  for (const p of document.querySelectorAll('.train-pane')) p.hidden = p.id !== 'train-' + sub;
+  for (const p of document.querySelectorAll('#tab-puzzles .train-pane')) p.hidden = p.id !== 'train-' + sub;
   A.store.set('trainSub', sub);
+  if (sub === 'pzhome') renderPzHome();
   if (sub === 'mistakes') refreshMistakesInfo();
   if (sub === 'rush') rushUi();
   if (sub === 'tutor') renderTutorReport();
@@ -207,7 +257,7 @@ async function nextLichessPuzzle() {
       const exp = 1 / (1 + 10 ** ((pr - st.rating) / 400));
       st.rating = Math.round(st.rating + 24 * ((ok ? 1 : 0) - exp));
       if (ok) { st.solved++; st.streak++; } else { st.failed++; st.streak = 0; }
-      savePzStats(); renderPzStats();
+      savePzStats(); renderPzStats(); if (ok) A.markActive?.();
     },
     next: nextLichessPuzzle,
   }, 'pz-box');
@@ -380,17 +430,52 @@ function repProgress(rep) {
   }
   return { total, learned };
 }
+/** Liczba pozycji do powtórki (już ćwiczone, termin minął) – do kafelków i strony głównej. */
+export function repDue(rep) {
+  const now = Date.now(); let n = 0;
+  for (const [key, moves] of Object.entries(rep.tree)) {
+    if (key.split(' ')[1] !== rep.color || !Object.keys(moves).length) continue;
+    const s = rep.stats[key];
+    if (s && s.ok + s.bad > 0 && s.due <= now) n++;
+  }
+  return n;
+}
+/** Pozycja „okładki”: koniec głównej linii (maks. 10 półruchów). */
+export function repCoverFen(rep) {
+  let fen = START;
+  for (let i = 0; i < 10; i++) {
+    const node = rep.tree[epd(fen)];
+    const u = node && Object.values(node)[0];
+    if (!u) break;
+    try { fen = playOn(fen, u).fen; } catch { break; }
+  }
+  return fen;
+}
 async function renderRepList() {
   const reps = await repList();
   $('rep-list').innerHTML = reps.length ? reps.map((r) => {
     const p = repProgress(r);
+    const due = repDue(r);
+    const seen = Object.keys(r.stats).length;
     const pct = p.total ? Math.round((p.learned / p.total) * 100) : 0;
-    return `<div class="rep-item" data-id="${r.id}">
-      <div><b>${esc(r.name)}</b> <span class="muted">${r.color === 'w' ? 'białe' : 'czarne'} · ${r.lines} linii · ${p.total} pozycji</span>
-        <div class="bar"><div style="width:${pct}%"></div></div><span class="muted">${pct}% opanowane</span></div>
-      <div class="rep-btns"><button class="btn primary" data-r="drill">Ćwicz</button>
-        <label class="btn file" title="Dodaj kolejne warianty z pliku PGN">＋PGN<input type="file" accept=".pgn,.txt" multiple hidden data-r="add"></label>
-        <button class="btn" data-r="del" title="Usuń drill">✕</button></div></div>`;
+    const pctSeen = p.total ? Math.min(100, Math.round((seen / p.total) * 100)) : 0;
+    return `<div class="course" data-id="${r.id}">
+      <div class="course-cover">${A.miniBoard(repCoverFen(r), { flip: r.color === 'b' })}</div>
+      <div class="course-body">
+        <div class="course-title">${esc(r.name)} <span class="pill">${r.color === 'w' ? '⚪ białe' : '⚫ czarne'}</span></div>
+        <div class="course-prog">
+          <div><small class="mono">${Math.min(seen, p.total)} / ${p.total} pozycji poznanych</small><div class="bar"><div style="width:${pctSeen}%;background:#6aa8ff"></div></div></div>
+          <div><small class="mono">${p.learned} / ${p.total} opanowanych · ${r.lines} linii</small><div class="bar"><div style="width:${pct}%"></div></div></div>
+        </div>
+      </div>
+      <div class="course-btns">
+        <button class="btn review ${due ? '' : 'off'}" data-r="review">Powtórka${due ? `<span class="due">${due}</span>` : ''}</button>
+        <button class="btn primary" data-r="learn">Ucz się</button>
+        <div class="course-more">
+          <label class="icon-btn" title="Dodaj warianty z pliku PGN">＋PGN<input type="file" accept=".pgn,.txt" multiple hidden data-r="add"></label>
+          <button class="icon-btn" data-r="del" title="Usuń drill">✕</button>
+        </div>
+      </div></div>`;
   }).join('') : '<p class="muted">Nie masz jeszcze żadnego drilla. Utwórz go poniżej, np. z pliku PGN z wariantami (eksport z ChessBase, studium lichess).</p>';
 }
 
@@ -438,12 +523,13 @@ function needScore(rep, fen, depth, memo) {
   return score;
 }
 
-async function startDrill(id) {
+export async function startDrill(id, mode) {
   const rep = await idb.get('rep:' + id);
   if (!rep) return;
-  Object.assign(DR, { rep, fen: START, last: null, errs: 0, line: (DR.rep?.id === id ? DR.line : 0) + 1, wrongNow: 0, waiting: false });
+  mode = mode || DR.mode || 'review';
+  Object.assign(DR, { rep, mode, fen: START, last: null, errs: 0, line: (DR.rep?.id === id ? DR.line : 0) + 1, wrongNow: 0, waiting: false });
   $('drill-box').hidden = false;
-  drillStatus(`Linia ${DR.line}. Graj ${rep.color === 'w' ? 'białymi' : 'czarnymi'} według repertuaru „${esc(rep.name)}”.`);
+  drillStatus(`${mode === 'learn' ? 'Nauka' : 'Powtórka'} · linia ${DR.line}. Graj ${rep.color === 'w' ? 'białymi' : 'czarnymi'} według „${esc(rep.name)}”.`);
   current = { kind: 'drill', resume: drillView };
   drillStep();
 }
@@ -458,7 +544,17 @@ async function drillStep() {
   const node = DR.rep.tree[epd(DR.fen)];
   if (!node || !Object.keys(node).length) return drillLineDone();
   const turn = DR.fen.split(' ')[1];
-  if (turn === DR.rep.color) { DR.wrongNow = 0; drillView(); return; }
+  if (turn === DR.rep.color) {
+    DR.wrongNow = 0;
+    const st = DR.rep.stats[epd(DR.fen)];
+    if (DR.mode === 'learn' && (!st || !st.ok)) {
+      DR.wrongNow = 1; // podpowiedź = ruch nie liczy się jako opanowany za pierwszym razem
+      drillStatus(`Nowa pozycja – zagraj zaznaczony ruch: <b>${esc(Object.keys(node).join(', '))}</b>`);
+      drillView(Object.values(node).map((u) => ({ orig: u.slice(0, 2), dest: u.slice(2, 4), brush: 'blue' })));
+      return;
+    }
+    drillView(); return;
+  }
   drillView();
   await sleep(420);
   const entries = Object.entries(node);
@@ -752,6 +848,12 @@ export function initTraining(api) {
   $('pz-diff').value = A.store.get('pzDiff', 'normal');
   $('train-sub').onclick = (e) => { const s = e.target.dataset.sub; if (s) setSub(s); };
   $('pz-start').onclick = nextLichessPuzzle;
+  $('train-pzhome').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-theme]')?.dataset.theme;
+    if (t) { $('pz-theme').value = t; setSub('puzzles'); nextLichessPuzzle(); return; }
+    const m = e.target.closest('[data-pz]')?.dataset.pz;
+    if (m) openPuzzles(m);
+  });
   for (const b of document.querySelectorAll('[data-rush]')) b.onclick = () => startRush(b.dataset.rush);
   $('mk-start').onclick = nextMistake;
   $('mk-clear').onclick = async () => {
@@ -775,7 +877,8 @@ export function initTraining(api) {
     const b = e.target.closest('[data-r]');
     const id = e.target.closest('[data-id]')?.dataset.id;
     if (!b || !id || b.dataset.r === 'add') return;
-    if (b.dataset.r === 'drill') { DR.line = 0; startDrill(id); }
+    if (b.dataset.r === 'drill' || b.dataset.r === 'review') { DR.line = 0; startDrill(id, 'review'); }
+    if (b.dataset.r === 'learn') { DR.line = 0; startDrill(id, 'learn'); }
     if (b.dataset.r === 'del') {
       const rep = await idb.get('rep:' + id);
       if (confirm(`Usunąć drill „${rep?.name}”?`)) { await idb.del('rep:' + id); renderRepList(); }
@@ -806,9 +909,9 @@ export function initTraining(api) {
   for (const id of ['tu-site', 'tu-user', 'tu-speed']) $(id).addEventListener('change', renderTutorReport);
   $('tu-report').addEventListener('click', (e) => {
     const t = e.target.closest('[data-theme]')?.dataset.theme;
-    if (t) { $('pz-theme').value = t; setSub('puzzles'); nextLichessPuzzle(); }
-    if (e.target.closest('[data-go="mistakes"]')) { setSub('mistakes'); nextMistake(); }
+    if (t) { A.showTab('puzzles'); $('pz-theme').value = t; setSub('puzzles'); nextLichessPuzzle(); }
+    if (e.target.closest('[data-go="mistakes"]')) { A.showTab('puzzles'); setSub('mistakes'); nextMistake(); }
   });
   renderPzStats();
-  setSub((['puzzles', 'rush', 'mistakes', 'tutor'].includes(A.store.get('trainSub', 'puzzles')) ? A.store.get('trainSub', 'puzzles') : 'puzzles'));
+  setSub((['pzhome', 'puzzles', 'rush', 'mistakes'].includes(A.store.get('trainSub', 'pzhome')) ? A.store.get('trainSub', 'pzhome') : 'pzhome'));
 }

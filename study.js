@@ -287,7 +287,7 @@ async function newFromGame() {
   openStudy(study.id);
 }
 
-function setStudySub(sub) {
+export function setStudySub(sub) {
   for (const b of $('study-sub').children) b.classList.toggle('active', b.dataset.sub === sub);
   $('study-studies').hidden = sub !== 'studies';
   $('study-drills').hidden = sub !== 'drills';

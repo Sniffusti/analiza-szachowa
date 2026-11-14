@@ -6,7 +6,26 @@ const CLIENT_ID = 'analiza-szachowa';
 const SCOPES = 'board:play challenge:read challenge:write puzzle:read study:read';
 
 const DEFAULT = { name: '', avatar: '', chesscom: '', lichess: '', rating: 1200, games: 0, created: 0 };
-export function profile() { return { ...DEFAULT, ...A.store.get('profile', {}) }; }
+export function profile() {
+  const p = { ...DEFAULT, ...A.store.get('profile', {}) };
+  p.ratings = { bullet: 1200, blitz: 1200, rapid: 1200, ...(p.ratings || {}) };
+  p.career = { rating: 1200, games: 0, wins: 0, best: 1200, ...(p.career || {}) };
+  return p;
+}
+/** Zapisuje dzisiejszy dzień jako aktywny (seria dni jak na chess.com). */
+export function markActive() {
+  const days = new Set(A.store.get('activeDays', []));
+  days.add(new Date().toISOString().slice(0, 10));
+  A.store.set('activeDays', [...days].sort().slice(-400));
+}
+export function streak() {
+  const days = new Set(A.store.get('activeDays', []));
+  let n = 0;
+  const d = new Date();
+  if (!days.has(d.toISOString().slice(0, 10))) d.setDate(d.getDate() - 1);
+  while (days.has(d.toISOString().slice(0, 10))) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
 export function saveProfile(p) { A.store.set('profile', p); renderBadge(); }
 
 export function lichessToken() { return A.store.get('lichessOAuth', '') || ''; }
@@ -86,14 +105,15 @@ export function avatarHtml(p = profile(), size = 28) {
 }
 function renderBadge() {
   const p = profile();
-  $('profile-badge').innerHTML = p.name ? `${avatarHtml(p, 26)}<span>${esc(p.name)}</span><small class="mono">${p.rating}</small>` : `<span class="ava ph" style="width:26px;height:26px">+</span><span>Utwórz konto</span>`;
+  $('profile-badge').innerHTML = p.name ? `${avatarHtml(p, 26)}<span>${esc(p.name)}</span><small class="mono">${p.ratings.blitz}</small>` : `<span class="ava ph" style="width:26px;height:26px">+</span><span>Utwórz konto</span>`;
 }
 function renderProfile() {
   const p = profile();
   const li = lichessToken();
   $('pf-ava').innerHTML = avatarHtml(p, 72);
   $('pf-name').value = p.name; $('pf-cc').value = p.chesscom; $('pf-li').value = p.lichess;
-  $('pf-stats').innerHTML = `<span class="pill accent">Ranking z silnikiem ${p.rating}</span><span class="pill">Partie ${p.games || 0}</span>`;
+  const pz = A.store.get('puzzleStats', { rating: 1500 });
+  $('pf-stats').innerHTML = `<span class="pill accent">Bullet ${p.ratings.bullet}</span><span class="pill accent">Blitz ${p.ratings.blitz}</span><span class="pill accent">Rapid ${p.ratings.rapid}</span><span class="pill">Kariera ${p.career.rating}</span><span class="pill">Boty ${p.rating}</span><span class="pill">Zadania ${pz.rating}</span><span class="pill">Partie ${p.games || 0}</span>`;
   $('pf-lichess').innerHTML = li
     ? `<span class="pill accent">Połączono z lichess${p.lichess ? ': ' + esc(p.lichess) : ''}</span> <button class="btn" id="pf-logout">Wyloguj z lichess</button>`
     : `<button class="btn primary" id="pf-login">Zaloguj przez lichess</button> <span class="muted">Potrzebne do gry na lichess. Hasło wpisujesz tylko na stronie lichess.</span>`;

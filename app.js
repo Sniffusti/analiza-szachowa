@@ -5,10 +5,11 @@ import * as C from './classify.js';
 import { splitGames, buildGame, gameFromFen, parseHeaders } from './pgn.js';
 import { idb } from './store.js';
 import * as fx from './fx.js';
-import { initTraining, onShowTab, addMistakesFromReview, drills } from './train.js';
-import { initStudy, onShowStudyTab, catSays } from './study.js';
-import { initPlay, onShowPlayTab } from './play.js';
-import { initProfile, profile, saveProfile, lichessToken, lichessUser } from './profile.js';
+import { initTraining, onShowTab, addMistakesFromReview, drills, openPuzzles, repDue, repCoverFen, startDrill } from './train.js';
+import { initHome, renderHome, miniBoard } from './home.js';
+import { initStudy, onShowStudyTab, catSays, setStudySub } from './study.js';
+import { initPlay, onShowPlayTab, quickPlay, playBots, playCareer, playFriend } from './play.js';
+import { initProfile, profile, saveProfile, lichessToken, lichessUser, avatarHtml, markActive, streak } from './profile.js';
 
 // ---------- narzędzia ----------
 const $ = (id) => document.getElementById(id);
@@ -1284,7 +1285,12 @@ document.addEventListener('keydown', (e) => {
 $('board').addEventListener('wheel', (e) => { e.preventDefault(); go(e.deltaY > 0 ? 1 : -1); }, { passive: false });
 
 // ---------- zakładki ----------
+const PAGE_TITLES = { home: 'Start', play: 'Graj', puzzles: 'Zadania', study: 'Ucz się', train: 'Trener', analysis: 'Analiza', report: 'Przegląd partii', openings: 'Otwarcia', import: 'Import', settings: 'Ustawienia' };
 function showTab(name) {
+  document.querySelector('.app').hidden = name === 'home';
+  $('page-title').textContent = PAGE_TITLES[name] || '';
+  if (name === 'home') renderHome(HOME_API);
+  store.set('lastTab', name);
   for (const b of document.querySelectorAll('.tabs button')) b.classList.toggle('active', b.dataset.tab === name);
   for (const t of document.querySelectorAll('.tab')) t.hidden = t.id !== 'tab-' + name;
   if (name === 'openings') scheduleExplorer(true);
@@ -1295,8 +1301,9 @@ function showTab(name) {
   onShowTab(name);
   onShowStudyTab(name);
   onShowPlayTab(name);
-  fx.enter(document.querySelectorAll(`#tab-${name} > *`), { step: 30, dist: 6 });
+  if (name !== 'home') fx.enter(document.querySelectorAll(`#tab-${name} > *`), { step: 30, dist: 6 });
 }
+let HOME_API = null;
 document.querySelector('.tabs').onclick = (e) => { const b = e.target.closest('[data-tab]'); if (b) showTab(b.dataset.tab); };
 
 // ---------- ustawienia ----------
@@ -1607,14 +1614,21 @@ async function init() {
   setExplorerSrc(S.explorerSrc);
   refreshDbList().catch(() => {});
   initTraining({
-    S, render, sound, toast, badgeHtml, store, fetchUserPgns, terminalEval, catSays,
+    S, render, sound, toast, badgeHtml, store, fetchUserPgns, terminalEval, catSays, showTab, markActive,
+    miniBoard: (fen, o) => miniBoard(fen, o),
     openings: () => S.openings,
     engineId: () => $('review-engine').value,
     loadPgnText: (t) => { S.train = null; loadPgnText(t, { review: false }); },
   });
+  HOME_API = {
+    store, profile, avatarHtml, streak, apiFetch, showTab, reviewPgn: (pgn) => { loadPgnText(pgn, { review: true }); showTab('report'); },
+    pieceUrl: (k) => pieceUrl(S.settings.pieceSet, k), repDue, repCoverFen, quickPlay, playBots, playCareer, playFriend, openPuzzles,
+    openDrills: (id) => { showTab('study'); setStudySub('drills'); if (id) startDrill(id, 'learn'); },
+  };
+  initHome(HOME_API);
   initProfile({ store, toast, sound, showTab });
   initPlay({
-    S, render, sound, toast, store, catSays, profile, saveProfile, lichessToken, lichessUser,
+    S, render, sound, toast, store, catSays, profile, saveProfile, lichessToken, lichessUser, avatarHtml, markActive, showTab,
     reviewPgn: (pgn) => { loadPgnText(pgn, { review: true }); showTab('report'); },
   });
   initStudy({
@@ -1623,6 +1637,7 @@ async function init() {
   });
   renderReportSummary();
   render();
+  if (!new URLSearchParams(location.search).get('join')) showTab('home');
 }
 init();
 

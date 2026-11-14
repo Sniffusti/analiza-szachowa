@@ -1313,10 +1313,13 @@ $('btn-copy-pgn').onclick = () => copy(exportPgn(), 'PGN');
 $('btn-copy-fen').onclick = () => copy(curFen(), 'FEN');
 
 // ---------- przyciski / klawiatura ----------
-$('nav-first').onclick = () => (S.explore ? ((S.explore.idx = 0), render()) : goTo(0));
-$('nav-prev').onclick = () => go(-1);
-$('nav-next').onclick = () => go(1);
-$('nav-last').onclick = () => (S.explore ? ((S.explore.idx = S.explore.moves.length), render()) : goTo(S.game.moves.length));
+// w trybie treningu/partii nawigację obsługuje aktywny moduł (partia, opracowanie)
+const navKey = { 'nav-first': 'Home', 'nav-prev': 'ArrowLeft', 'nav-next': 'ArrowRight', 'nav-last': 'End' };
+const trainNav = (id) => S.train?.onKey?.(navKey[id]);
+$('nav-first').onclick = () => trainNav('nav-first') || (S.explore ? ((S.explore.idx = 0), render()) : goTo(0));
+$('nav-prev').onclick = () => trainNav('nav-prev') || go(-1);
+$('nav-next').onclick = () => trainNav('nav-next') || go(1);
+$('nav-last').onclick = () => trainNav('nav-last') || (S.explore ? ((S.explore.idx = S.explore.moves.length), render()) : goTo(S.game.moves.length));
 $('nav-play').onclick = () => {
   if (S.playing) { clearInterval(S.playing); S.playing = null; $('nav-play').textContent = '▶'; return; }
   $('nav-play').textContent = '❚❚';
@@ -1330,7 +1333,7 @@ $('btn-return').onclick = () => { S.retry = null; returnToGame(); };
 $('btn-flip').onclick = () => { S.orientation = S.orientation === 'white' ? 'black' : 'white'; render(); };
 $('btn-new').onclick = () => { setGame(gameFromFen(new Chess().fen())); showTab('analysis'); };
 document.addEventListener('keydown', (e) => {
-  if (e.target.matches('input, textarea, select')) return;
+  if (e.target.matches?.('input, textarea, select')) return;
   if (S.train?.onKey?.(e.key)) { e.preventDefault(); return; }
   if (e.key === 'ArrowLeft') { go(-1); e.preventDefault(); }
   else if (e.key === 'ArrowRight') { go(1); e.preventDefault(); }

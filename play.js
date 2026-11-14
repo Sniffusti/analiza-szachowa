@@ -45,13 +45,38 @@ export function categoryOf(tcStr) {
 const G = { chess: null, color: 'w', on: false, mode: null, clocks: null, timer: null, last: null, inc: 0 };
 
 // ---------------------------------------------------------------- wspólne
+/** Pozycja po `ply` półruchach (do przeglądania w trakcie partii). */
+function positionAt(ply) {
+  const hist = G.chess.history({ verbose: true });
+  const c = new Chess(hist[0]?.before || G.chess.fen());
+  let last = null;
+  for (let i = 0; i < ply; i++) last = c.move(hist[i].san);
+  return { fen: c.fen(), last: last ? [last.from, last.to] : null };
+}
+function onKey(key) {
+  if (!G.chess) return false;
+  const n = G.chess.history().length;
+  let v = G.viewPly ?? n;
+  if (key === 'ArrowLeft') v = Math.max(0, v - 1);
+  else if (key === 'ArrowRight') v = Math.min(n, v + 1);
+  else if (key === 'Home') v = 0;
+  else if (key === 'End') v = n;
+  else return false;
+  G.viewPly = v >= n ? null : v;
+  if (G.viewPly !== null) { const pos = positionAt(v); const san = G.chess.history()[v - 1]; if (san) A.sound.forSan(san); }
+  renderMoveList(); view();
+  return true;
+}
 function view() {
   const live = G.on && G.mode !== 'review';
+  const browsing = G.viewPly !== null && G.viewPly !== undefined && G.viewPly < G.chess.history().length;
+  const pos = browsing ? positionAt(G.viewPly) : null;
   A.S.train = {
-    fen: G.chess.fen(), lastMove: G.last, orientation: G.color === 'w' ? 'white' : 'black', hideEval: true, shapes: [], onMove: onUserMove,
+    fen: browsing ? pos.fen : G.chess.fen(), lastMove: browsing ? pos.last : G.last, orientation: G.color === 'w' ? 'white' : 'black', hideEval: true, shapes: [], onMove: onUserMove,
+    onKey, locked: browsing,
     players: G.headers,
     playerColor: live ? (G.color === 'w' ? 'white' : 'black') : undefined,
-    premoves: live ? G.queue || [] : [],
+    premoves: live && !browsing ? G.queue || [] : [],
     onPremove: (o, d) => { (G.queue ||= []).push([o, d]); A.cg.cancelPremove(); view(); },
     onPremoveCancel: () => { G.queue = []; view(); },
   };
@@ -123,14 +148,16 @@ function pgnOf(result) {
 function renderMoveList() {
   const h = G.chess.history();
   let html = '';
-  for (let i = 0; i < h.length; i += 2) html += `<div class="mrow"><span class="mno">${i / 2 + 1}.</span><span class="mv">${esc(h[i])}</span><span class="mv">${esc(h[i + 1] || '')}</span></div>`;
+  const cur = G.viewPly ?? h.length;
+  const cell = (i) => (h[i] ? `<span class="mv${i + 1 === cur ? ' cur' : ''}" data-ply="${i + 1}">${esc(h[i])}</span>` : '<span class="mv"></span>');
+  for (let i = 0; i < h.length; i += 2) html += `<div class="mrow"><span class="mno">${i / 2 + 1}.</span>${cell(i)}${cell(i + 1)}</div>`;
   $('play-moves').innerHTML = html;
-  $('play-moves').lastElementChild?.scrollIntoView({ block: 'nearest' });
+  ($('play-moves').querySelector('.mv.cur') || $('play-moves').lastElementChild)?.scrollIntoView({ block: 'nearest' });
 }
 function beginGame({ mode, color, tc, oppName, oppAva, oppRating, myRating, event, elo }) {
   const [base, inc] = String(tc || '0').split('+').map(Number);
   Object.assign(G, {
-    chess: new Chess(), color, on: true, mode, last: null, tc: String(tc || '0'), queue: [], pendingUci: null,
+    chess: new Chess(), color, on: true, mode, last: null, tc: String(tc || '0'), queue: [], pendingUci: null, viewPly: null,
     clocks: base ? { w: base * 60000, b: base * 60000 } : null, inc: (inc || 0) * 1000,
     oppName, oppAva, oppRating, myRating, elo,
   });
@@ -143,6 +170,7 @@ function beginGame({ mode, color, tc, oppName, oppAva, oppRating, myRating, even
   renderMoveList(); startTimer(); renderClocks(); view();
 }
 function afterMove() {
+  G.viewPly = null;
   renderMoveList(); renderClocks(); view();
   const c = G.chess;
   if (c.isCheckmate()) return endGame(c.turn() === G.color ? 'loss' : 'win', 'Mat');
@@ -153,6 +181,7 @@ function afterMove() {
   if ((G.mode === 'bot' || G.mode === 'career' || G.mode === 'custom') && c.turn() !== G.color) engineMove();
 }
 async function onUserMove(uci) {
+  if (G.viewPly !== null && G.viewPly !== undefined) { G.viewPly = null; renderMoveList(); view(); return; }
   if (!G.on) { view(); return; }
   if (G.chess.turn() !== G.color) { view(); return; }
   if (G.mode === 'lichess') return lichessMove(uci);
@@ -534,6 +563,12 @@ export function initPlay(api) {
   $('bot-cats').onclick = (e) => { const b = e.target.closest('[data-bot]'); if (b) { selectedBot = BOTS[+b.dataset.bot]; A.store.set('bot', +b.dataset.bot); renderBots(); } };
   $('bot-start').onclick = () => startBotGame(selectedBot);
   $('career-start').onclick = () => { const c = A.profile().career; startBotGame({ ...botForElo(c.rating), elo: c.rating }, { mode: 'career', tc: $('career-tc').value, color: pickColor('r') }); };
+  $('play-moves').onclick = (e) => {
+    const m = e.target.closest('[data-ply]'); if (!m || !G.chess) return;
+    const n = G.chess.history().length, v = +m.dataset.ply;
+    G.viewPly = v >= n ? null : v;
+    renderMoveList(); view();
+  };
   $('play-start').onclick = () => { const elo = +$('play-elo').value; startBotGame({ ...botForElo(elo), name: `Stockfish ${elo}`, elo }, { mode: 'custom', color: pickColor($('play-color').value), tc: $('play-tc').value }); };
   $('online-friend').onclick = hostFriend;
   $('online-seek').onclick = matchmake;

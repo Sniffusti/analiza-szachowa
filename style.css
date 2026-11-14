@@ -685,3 +685,9 @@ cg-board square.oc.premove-dest { background: radial-gradient(transparent 0%, tr
 .mat piece:first-child, .mat piece.gap { margin-left: 2px; }
 .mat b { margin-left: 5px; font: 700 12px var(--sans); color: var(--muted); }
 .clock .who .mat piece { width: 16px; height: 16px; }
+/* partia: lista ruchów przewija się w ramce, zegary i przyciski zostają na miejscu */
+#play-game { display: flex; flex-direction: column; gap: 8px; }
+#play-game .moves { max-height: min(42vh, 420px); overflow-y: auto; margin-top: 0; }
+#play-game .mv { cursor: pointer; }
+#moves, #moves-analysis { max-height: 46vh; overflow-y: auto; }
+.sv-tree { max-height: 42vh; }

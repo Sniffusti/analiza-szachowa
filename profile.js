@@ -12,6 +12,18 @@ export function profile() {
   p.career = { rating: 1200, games: 0, wins: 0, best: 1200, ...(p.career || {}) };
   return p;
 }
+/** Historia rankingu (do wykresów): kategoria → [{t, v}] */
+export function pushRating(cat, v) {
+  if (v === null || v === undefined || isNaN(v)) return;
+  const h = A.store.get('ratingHistory', {});
+  const arr = h[cat] || [];
+  const last = arr[arr.length - 1];
+  if (last && last.v === v && Date.now() - last.t < 6 * 3600e3) return;
+  arr.push({ t: Date.now(), v });
+  h[cat] = arr.slice(-250);
+  A.store.set('ratingHistory', h);
+}
+export function ratingHistory(cat) { return A.store.get('ratingHistory', {})[cat] || []; }
 /** Zapisuje dzisiejszy dzień jako aktywny (seria dni jak na chess.com). */
 export function markActive() {
   const days = new Set(A.store.get('activeDays', []));
@@ -105,6 +117,8 @@ export function avatarHtml(p = profile(), size = 28) {
 }
 function renderBadge() {
   const p = profile();
+  const sb = document.getElementById('sb-user');
+  if (sb) sb.innerHTML = p.name ? `${avatarHtml(p, 30)}<span><b>${esc(p.name)}</b><small>Blitz ${p.ratings.blitz}</small></span>` : `<span class="ava ph" style="width:30px;height:30px">+</span><span><b>Utwórz konto</b><small>zapisz postępy</small></span>`;
   $('profile-badge').innerHTML = p.name ? `${avatarHtml(p, 26)}<span>${esc(p.name)}</span><small class="mono">${p.ratings.blitz}</small>` : `<span class="ava ph" style="width:26px;height:26px">+</span><span>Utwórz konto</span>`;
 }
 function renderProfile() {
@@ -141,6 +155,7 @@ export function initProfile(api) {
     renderProfile();
   };
   $('pf-del-ava').onclick = () => { const p = profile(); p.avatar = ''; saveProfile(p); renderProfile(); };
+  document.getElementById('sb-user').onclick = () => { A.showTab('settings'); };
   $('profile-badge').onclick = () => { A.showTab('settings'); $('pf-name').scrollIntoView({ block: 'center' }); if (!profile().name) $('pf-name').focus(); };
   renderProfile();
   finishLogin().catch((e) => A.toast('Logowanie: ' + e.message));

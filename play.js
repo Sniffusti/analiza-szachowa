@@ -45,8 +45,26 @@ const G = { chess: null, color: 'w', on: false, mode: null, clocks: null, timer:
 
 // ---------------------------------------------------------------- wspólne
 function view() {
-  A.S.train = { fen: G.chess.fen(), lastMove: G.last, orientation: G.color === 'w' ? 'white' : 'black', hideEval: true, shapes: [], onMove: onUserMove };
+  const live = G.on && G.mode !== 'review';
+  A.S.train = {
+    fen: G.chess.fen(), lastMove: G.last, orientation: G.color === 'w' ? 'white' : 'black', hideEval: true, shapes: [], onMove: onUserMove,
+    playerColor: live ? (G.color === 'w' ? 'white' : 'black') : undefined,
+    premoves: live ? G.queue || [] : [],
+    onPremove: (o, d) => { (G.queue ||= []).push([o, d]); A.cg.cancelPremove(); view(); },
+    onPremoveCancel: () => { G.queue = []; view(); },
+  };
   A.render();
+}
+/** Po ruchu przeciwnika: wykonaj pierwszy zaplanowany premove (jeśli legalny), resztę zostaw w kolejce. */
+function runPremove() {
+  if (!G.on || !G.queue?.length || G.chess.turn() !== G.color) return false;
+  const [o, d] = G.queue.shift();
+  const piece = G.chess.get(o);
+  const promo = piece?.type === 'p' && (d[1] === '8' || d[1] === '1') ? 'q' : '';
+  const ok = G.chess.moves({ verbose: true }).some((m) => m.from === o && m.to === d);
+  if (!ok) { G.queue = []; view(); return false; }
+  setTimeout(() => onUserMove(o + d + promo), 30);
+  return true;
 }
 function fmtClock(ms) {
   if (ms === null || ms === undefined) return '–';
@@ -58,7 +76,7 @@ function playerRow(side) {
   const me = side === G.color;
   const p = A.profile();
   const name = me ? (p.name || 'Ty') : G.oppName;
-  const ava = me ? A.avatarHtml(p, 30) : `<img class="ava" src="${G.oppAva || 'cat.png'}" width="30" height="30" alt="">`;
+  const ava = me ? A.avatarHtml(p, 30) : `<img class="ava" src="${G.oppAva || 'cat.png'}" width="30" height="30" alt="" onerror="this.src='cat.png'">`;
   const rating = me ? G.myRating : G.oppRating;
   const turn = G.on && G.chess.turn() === side;
   return `<div class="clock ${me ? 'me' : ''} ${turn ? 'run' : ''}"><span class="who">${ava}<span>${esc(name)} <small class="mono">${rating ?? ''}</small></span></span><b>${G.clocks ? fmtClock(G.clocks[side]) : ''}</b></div>`;
@@ -70,17 +88,17 @@ function renderClocks() {
 }
 function startTimer() {
   clearInterval(G.timer);
-  if (!G.clocks || G.mode === 'lichess') return;
+  if (!G.clocks) return;
   let lastT = performance.now();
   G.timer = setInterval(() => {
     const now = performance.now();
-    if (G.on && G.chess.history().length >= (G.mode === 'online' ? 2 : 0)) {
+    if (G.on && G.chess.history().length >= (G.mode === 'online' || G.mode === 'lichess' ? 2 : 0)) {
       const t = G.chess.turn();
       G.clocks[t] -= now - lastT;
       if (G.clocks[t] <= 0) {
         G.clocks[t] = 0;
         if (G.mode === 'online' && t === G.color) send({ t: 'flag' });
-        if (G.mode !== 'online' || t === G.color) endGame(t === G.color ? 'loss' : 'win', 'Na czas');
+        if (G.mode !== 'lichess' && (G.mode !== 'online' || t === G.color)) endGame(t === G.color ? 'loss' : 'win', 'Na czas');
       }
     }
     lastT = now;
@@ -110,7 +128,7 @@ function renderMoveList() {
 function beginGame({ mode, color, tc, oppName, oppAva, oppRating, myRating, event, elo }) {
   const [base, inc] = String(tc || '0').split('+').map(Number);
   Object.assign(G, {
-    chess: new Chess(), color, on: true, mode, last: null, tc: String(tc || '0'),
+    chess: new Chess(), color, on: true, mode, last: null, tc: String(tc || '0'), queue: [], pendingUci: null,
     clocks: base ? { w: base * 60000, b: base * 60000 } : null, inc: (inc || 0) * 1000,
     oppName, oppAva, oppRating, myRating, elo,
   });
@@ -133,7 +151,8 @@ function afterMove() {
   if ((G.mode === 'bot' || G.mode === 'career' || G.mode === 'custom') && c.turn() !== G.color) engineMove();
 }
 async function onUserMove(uci) {
-  if (!G.on || G.chess.turn() !== G.color) { view(); return; }
+  if (!G.on) { view(); return; }
+  if (G.chess.turn() !== G.color) { view(); return; }
   if (G.mode === 'lichess') return lichessMove(uci);
   const mv = G.chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
   if (G.clocks) G.clocks[mv.color] += G.inc;
@@ -178,6 +197,7 @@ async function engineMove() {
   G.last = [m.from, m.to];
   A.sound.forSan(m.san);
   afterMove();
+  runPremove();
 }
 function pickColor(v) { return v === 'r' ? (Math.random() < 0.5 ? 'w' : 'b') : v; }
 async function startBotGame(bot, opts = {}) {
@@ -197,6 +217,7 @@ async function startBotGame(bot, opts = {}) {
 async function endGame(res, reason) {
   if (!G.on) return;
   G.on = false;
+  G.queue = [];
   clearInterval(G.timer);
   engine.stop();
   const result = res === 'draw' ? '1/2-1/2' : (res === 'win') === (G.color === 'w') ? '1-0' : '0-1';
@@ -216,6 +237,9 @@ async function endGame(res, reason) {
     if (p.ratings[cat] !== undefined) { delta = elo(p.ratings[cat], G.oppRating || 1200, 32); p.ratings[cat] += delta; label = `Ranking ${cat}`; }
   }
   p.games = (p.games || 0) + 1;
+  if (G.mode === 'bot' || G.mode === 'custom') A.pushRating('bots', p.rating);
+  if (G.mode === 'career') A.pushRating('career', p.career.rating);
+  if (G.mode === 'online' && p.ratings[categoryOf(G.tc)] !== undefined) A.pushRating(categoryOf(G.tc), p.ratings[categoryOf(G.tc)]);
   A.markActive();
   A.saveProfile(p);
   const games = (await idb.get('games')) || [];
@@ -294,6 +318,7 @@ function onNet(m, isHost) {
     G.last = [mv.from, mv.to];
     A.sound.forSan(mv.san);
     afterMove();
+    runPremove();
   } else if (m.t === 'resign') endGame('win', 'Przeciwnik się poddał');
   else if (m.t === 'flag') endGame('win', 'Przeciwnikowi skończył się czas');
   else if (m.t === 'draw?') { if (confirm('Przeciwnik proponuje remis. Przyjąć?')) { send({ t: 'draw!' }); endGame('draw', 'Remis za zgodą'); } }
@@ -425,14 +450,20 @@ async function runLichessGame(id, ctrl) {
       state = e.state;
     }
     if (state.type === 'gameState') {
-      const prev = G.chess.history().length;
-      G.chess = new Chess();
-      let last = null;
-      for (const u of (state.moves || '').split(' ').filter(Boolean)) last = G.chess.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
-      G.last = last ? [last.from, last.to] : null;
-      if (last && G.chess.history().length > prev) A.sound.forSan(last.san);
+      const prevMoves = G.chess.history({ verbose: true }).map((m) => m.from + m.to + (m.promotion || ''));
+      const srv = (state.moves || '').split(' ').filter(Boolean);
+      const same = srv.length === prevMoves.length && srv.every((u, i) => u === prevMoves[i]);
+      if (!same) {
+        G.chess = new Chess();
+        let last = null;
+        for (const u of srv) last = G.chess.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
+        G.last = last ? [last.from, last.to] : null;
+        // dźwięk tylko dla nowego ruchu przeciwnika (własny już zagrał)
+        if (last && srv.length > prevMoves.length && last.color !== G.color) A.sound.forSan(last.san);
+      }
       G.clocks = { w: state.wtime, b: state.btime };
       renderMoveList(); renderClocks(); view();
+      if (!same && G.chess.turn() === G.color) runPremove();
       if (state.status && !['started', 'created'].includes(state.status)) {
         const res = !state.winner ? 'draw' : state.winner === (G.color === 'w' ? 'white' : 'black') ? 'win' : 'loss';
         endGame(res, { mate: 'Mat', resign: 'Poddanie', outoftime: 'Na czas', draw: 'Remis', stalemate: 'Pat', aborted: 'Przerwana' }[state.status] || state.status);
@@ -442,18 +473,26 @@ async function runLichessGame(id, ctrl) {
   }
 }
 async function lichessMove(uci) {
-  view();
+  let mv;
+  try { mv = G.chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] }); } catch { view(); return; }
+  G.last = [mv.from, mv.to];
+  G.pendingUci = uci;
+  A.sound.forSan(mv.san);
+  renderMoveList(); renderClocks(); view();
   const r = await liFetch(`/api/board/game/${G.liId}/move/${uci}`, { method: 'POST' });
-  if (!r.ok) { A.sound.play('Error'); A.toast('Lichess odrzucił ruch.'); }
+  if (!r.ok) {
+    A.sound.play('Error'); A.toast('Lichess odrzucił ruch.');
+    G.chess.undo(); G.pendingUci = null; G.queue = []; renderMoveList(); view();
+  }
 }
 
 // ---------------------------------------------------------------- UI
 let selectedBot = BOTS[4];
 function renderBots() {
   const b = selectedBot;
-  $('bot-preview').innerHTML = `<div class="bot-hero"><img src="${botAva(b)}" alt=""><div class="bubble">${esc(b.say)}</div></div><div class="bot-name">${esc(b.name)} <span class="mono">${b.elo}</span></div>`;
+  $('bot-preview').innerHTML = `<div class="bot-hero"><img src="${botAva(b)}" alt="" onerror="this.src='cat.png'"><div class="bubble">${esc(b.say)}</div></div><div class="bot-name">${esc(b.name)} <span class="mono">${b.elo}</span></div>`;
   $('bot-cats').innerHTML = GROUPS.map(([g, a, z]) => `<div class="bot-group"><div class="bg-head"><b>${g}</b><small>${z - a} boty</small></div>
-    <div class="bot-grid">${BOTS.slice(a, z).map((bt) => `<button class="bot ${bt === b ? 'on' : ''}" data-bot="${BOTS.indexOf(bt)}" title="${esc(bt.name)} ${bt.elo}"><img src="${botAva(bt)}" alt=""><span>${bt.elo}</span></button>`).join('')}</div></div>`).join('');
+    <div class="bot-grid">${BOTS.slice(a, z).map((bt) => `<button class="bot ${bt === b ? 'on' : ''}" data-bot="${BOTS.indexOf(bt)}" title="${esc(bt.name)} ${bt.elo}"><img src="${botAva(bt)}" alt="" onerror="this.src='cat.png'"><span>${bt.elo}</span></button>`).join('')}</div></div>`).join('');
 }
 function renderCareer() {
   const p = A.profile();

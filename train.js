@@ -257,7 +257,7 @@ async function nextLichessPuzzle() {
       const exp = 1 / (1 + 10 ** ((pr - st.rating) / 400));
       st.rating = Math.round(st.rating + 24 * ((ok ? 1 : 0) - exp));
       if (ok) { st.solved++; st.streak++; } else { st.failed++; st.streak = 0; }
-      savePzStats(); renderPzStats(); if (ok) A.markActive?.();
+      savePzStats(); renderPzStats(); A.pushRating?.('puzzle', st.rating); if (ok) A.markActive?.();
     },
     next: nextLichessPuzzle,
   }, 'pz-box');

@@ -581,3 +581,100 @@ cg-board square.check { background: radial-gradient(ellipse at center, rgba(255,
   .course-btns { grid-column: 1 / -1; flex-direction: row; }
   .course-prog { grid-template-columns: 1fr; gap: 4px; }
 }
+
+/* =====================================================================
+   Wygląd v3 – ciepły grafit jak chess.com, mniej „szablonowych” etykiet,
+   pełne karty, kolorowe ikony, przyciski z „podstawką”.
+   ===================================================================== */
+:root {
+  --bg: #1c1b19; --panel: #262522; --panel2: #2e2d2a; --raise: #383733;
+  --line: #34332f; --line-strong: #43423d;
+  --text: #f2f0ea; --muted: #a8a59c; --faint: #78756c;
+  --accent: #8f6cf2; --accent-l: #b9a2ff; --accent-d: #6a4bd0; --accent-soft: rgba(143, 108, 242, .16);
+  --tint-purple: #2b2638; --tint-green: #22301f; --tint-amber: #34291a; --tint-red: #35201f; --tint-slate: #222a33;
+  --sans: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+  --r: 12px;
+}
+body { font-family: var(--sans); background: var(--bg); }
+/* koniec z etykietami-wersalikami nad każdym tytułem */
+.tab > .eyebrow:first-child, #study-home .eyebrow, .an-pane > .eyebrow { display: none; }
+.sec-title { font-size: 24px; font-weight: 800; letter-spacing: -.02em; margin: 2px 0 14px; }
+.sec-title span { display: none; }
+h3 { font: 800 15px/1.2 var(--sans); text-transform: none; letter-spacing: 0; color: var(--text); margin: 22px 0 10px; }
+h3::before { display: none; }
+.eyebrow { font: 700 12px var(--sans); text-transform: none; letter-spacing: 0; color: var(--muted); }
+.eyebrow::before { display: none; }
+.strip { display: none; }
+.panel { background: var(--panel); border: none; border-radius: 16px; }
+.panel-head { border-bottom: none; padding: 14px 18px 4px; }
+.panel-head .brand { font-size: 20px; font-weight: 800; }
+.tab-body { padding: 8px 18px 24px; }
+/* przyciski jak na chess.com */
+.btn { border-radius: 10px; border: none; background: var(--raise); box-shadow: 0 3px 0 #141311; font-weight: 700; }
+.btn:hover { background: #42413c; }
+.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #141311; }
+.btn.primary, .btn.accent { background: var(--accent); box-shadow: 0 3px 0 var(--accent-d); }
+.btn.primary:hover { background: #9b7cf5; }
+.btn.big { font-size: 17px; padding: 14px; border-radius: 12px; box-shadow: 0 4px 0 var(--accent-d); }
+.btn.big:not(.primary) { box-shadow: 0 4px 0 #141311; }
+input, select, textarea { border-radius: 10px; border-color: var(--line-strong); background: #23221f; }
+/* segmenty jak pigułki */
+.seg { border: none; background: #23221f; border-radius: 12px; padding: 4px; gap: 4px; }
+.seg button { border: none; border-radius: 9px; font-weight: 700; }
+.seg button.active { background: var(--raise); color: #fff; box-shadow: 0 2px 0 #141311; }
+/* karty bez kresek */
+.card, .engine-box, .moves, .lines, .summary, .tu-table, .tu-plan, .tu-games, .game-list, .explorer table, .book-moves, .sv-tree, .graph-card, .coach .bubble { border: none; }
+.card, .engine-box, .graph-card, .sv-tree { background: var(--panel2); border-radius: 14px; }
+.moves, .summary, .tu-table, .tu-plan, .tu-games, .game-list, .explorer table, .book-moves { background: var(--panel2); border-radius: 14px; }
+.mrow, .line, .summary td, .tu-table td, .explorer td, .book-move, .tu-plan-row, .tu-game, .game-item, .rep-item { border-color: #393834 !important; }
+.mv.cur { background: var(--accent); }
+.num, .mono { font-family: "Geist Mono", ui-monospace, monospace; }
+/* pasek boczny */
+.sidebar { background: #161513; border-right: none; width: 186px; }
+.sb-brand { font-size: 21px; }
+.sidebar .tabs button { font-size: 15px; font-weight: 800; color: #e6e3db; padding: 8px 10px; }
+.sidebar .tabs button .ni { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--c); font-size: 16px; }
+.sidebar .tabs button.active { background: #2a2926; box-shadow: none; }
+.sidebar .tabs button.active .ni { background: var(--c); color: #161513; }
+.sb-account { border-top: 1px solid #2a2926; padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.sb-user { display: flex; align-items: center; gap: 10px; background: none; border: none; color: var(--text); cursor: pointer; padding: 6px; border-radius: 10px; text-align: left; }
+.sb-user:hover { background: #2a2926; }
+.sb-user b { display: block; font-size: 14px; }
+.sb-user small { color: var(--muted); font-size: 11.5px; }
+.sb-icons { display: flex; justify-content: space-around; }
+.sb-icons button { background: none; border: none; color: var(--muted); font-size: 17px; cursor: pointer; padding: 6px 10px; border-radius: 8px; }
+.sb-icons button:hover { color: #fff; background: #2a2926; }
+.profile-badge { display: none; }
+/* strona główna */
+.hcard { border: none; background: var(--panel); border-radius: 16px; box-shadow: inset 0 1px 0 rgba(255,255,255,.03); }
+.home-head .hh-user b { font-size: 20px; }
+.mini piece { display: block; width: 100%; height: 100%; background-size: cover; }
+.mini i { position: relative; }
+.mini i.l { background: #ebecd0; } .mini i.d { background: #8b6fd6; }
+/* karty rankingów */
+.rating-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.rcard { position: relative; background: var(--panel2); border-radius: 14px; padding: 12px 14px 8px; overflow: hidden; }
+.rc-top { display: flex; align-items: center; gap: 10px; }
+.rc-ico { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; font-size: 20px; background: color-mix(in srgb, var(--c) 20%, transparent); color: var(--c); flex: 0 0 auto; }
+.rc-top small { display: block; color: var(--muted); font-size: 12.5px; font-weight: 700; }
+.rc-top b { font-size: 26px; line-height: 1; }
+.rc-delta { margin-left: auto; font: 800 13px var(--sans); align-self: flex-start; }
+.rc-delta.up { color: #81b64c; } .rc-delta.down { color: #e5533d; }
+.chart { display: block; width: 100%; height: 64px; margin-top: 8px; overflow: visible; cursor: crosshair; }
+.chart .grid { stroke: #ffffff10; stroke-dasharray: 3 4; }
+.chart .cur { stroke: #ffffff55; stroke-width: 1; }
+.rc-tip { position: absolute; top: 8px; right: 10px; background: #0f0e0d; border-radius: 6px; padding: 2px 8px; font: 700 11px var(--sans); }
+.rating-src { display: flex; gap: 6px; margin: 0 0 10px; }
+.rating-src button { background: #23221f; border: none; color: var(--muted); border-radius: 999px; padding: 5px 12px; font-weight: 700; cursor: pointer; }
+.rating-src button.on { background: var(--accent); color: #fff; }
+.home .ratings-sec { grid-column: 1 / -1; }
+
+cg-board square.premove-q { background-color: rgba(70, 120, 230, .45); }
+cg-board square.current-premove { background-color: rgba(70, 120, 230, .45); }
+cg-board square.premove-dest { background: radial-gradient(rgba(70, 120, 230, .55) 19%, rgba(0, 0, 0, 0) 20%); }
+cg-board square.oc.premove-dest { background: radial-gradient(transparent 0%, transparent 79%, rgba(70, 120, 230, .45) 80%); }
+
+.rs-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rs-head .rating-src { margin: 0; }
+.home-grid .ratings-sec { grid-column: 2 / span 4; }
+.home-grid .history { grid-column: 2 / span 4; }

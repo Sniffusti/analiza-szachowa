@@ -9,7 +9,7 @@ import { initTraining, onShowTab, addMistakesFromReview, drills, openPuzzles, re
 import { initHome, renderHome, miniBoard } from './home.js';
 import { initStudy, onShowStudyTab, catSays, setStudySub } from './study.js';
 import { initPlay, onShowPlayTab, quickPlay, playBots, playCareer, playFriend } from './play.js';
-import { initProfile, profile, saveProfile, lichessToken, lichessUser, avatarHtml, markActive, streak } from './profile.js';
+import { initProfile, profile, saveProfile, lichessToken, lichessUser, avatarHtml, markActive, streak, pushRating, ratingHistory } from './profile.js';
 
 // ---------- narzędzia ----------
 const $ = (id) => document.getElementById(id);
@@ -28,18 +28,47 @@ const ROLES = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: '
 const BOARDS = ['brown.png', 'wood4.jpg', 'wood.jpg', 'wood2.jpg', 'wood3.jpg', 'maple.jpg', 'maple2.jpg', 'horsey.jpg', 'leather.jpg', 'blue.png', 'blue2.jpg', 'blue3.jpg', 'blue-marble.jpg', 'canvas2.jpg', 'green.png', 'green-plastic.png', 'marble.jpg', 'grey.jpg', 'metal.jpg', 'olive.jpg', 'ic.png', 'purple.png', 'purple-diag.png', 'pink-pyramid.png', 'ncf-board.png', 'svg/newspaper.svg'];
 
 // ---------- dźwięki (lichess) ----------
+// Dźwięki przez Web Audio: odblokowanie przy pierwszym kliknięciu/dotyku (iPhone, autoplay),
+// wstępnie zdekodowane bufory = brak opóźnień i blokad przy ruchach przeciwnika.
 const sound = {
   set: store.get('soundSet', 'standard'),
   vol: store.get('soundVol', 0.7),
-  cache: new Map(),
-  play(name) {
-    if (this.set === 'off' || this.vol <= 0) return;
+  ctx: null,
+  buffers: new Map(),
+  loading: new Map(),
+  ensureCtx() {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      this.ctx = new AC();
+    }
+    if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+    return this.ctx;
+  },
+  load(name) {
     const url = `sound/${this.set}/${name}.mp3`;
-    let base = this.cache.get(url);
-    if (!base) { base = new Audio(url); base.preload = 'auto'; this.cache.set(url, base); }
-    const a = base.cloneNode();
-    a.volume = this.vol;
-    a.play().catch(() => {});
+    if (this.buffers.has(url)) return Promise.resolve(this.buffers.get(url));
+    if (!this.loading.has(url)) {
+      const ctx = this.ensureCtx();
+      if (!ctx) return Promise.resolve(null);
+      this.loading.set(url, fetch(url).then((r) => r.arrayBuffer()).then((b) => new Promise((res, rej) => { const pr = ctx.decodeAudioData(b, res, rej); pr?.catch?.(() => {}); }))
+        .then((buf) => { this.buffers.set(url, buf); return buf; }).catch(() => null));
+    }
+    return this.loading.get(url);
+  },
+  preload() { for (const n of ['Move', 'Capture', 'Check', 'Checkmate', 'Error', 'Confirmation', 'GenericNotify']) this.load(n); },
+  async play(name) {
+    if (this.set === 'off' || this.vol <= 0) return;
+    const ctx = this.ensureCtx();
+    if (!ctx) { const a = new Audio(`sound/${this.set}/${name}.mp3`); a.volume = this.vol; a.play().catch(() => {}); return; }
+    const buf = await this.load(name);
+    if (!buf) return;
+    const src = ctx.createBufferSource();
+    const gain = ctx.createGain();
+    gain.gain.value = this.vol;
+    src.buffer = buf;
+    src.connect(gain).connect(ctx.destination);
+    src.start();
   },
   forSan(san) {
     if (!san) return;
@@ -49,6 +78,10 @@ const sound = {
     else this.play('Move');
   },
 };
+// pierwsza interakcja odblokowuje dźwięk (wymóg przeglądarek, szczególnie Safari na iPhonie)
+for (const ev of ['pointerdown', 'keydown', 'touchstart']) {
+  window.addEventListener(ev, () => { sound.ensureCtx(); sound.preload(); }, { once: true, passive: true });
+}
 let lastSoundFen = null;
 let muteNextSound = true;
 
@@ -136,7 +169,7 @@ function applyPieceSet() {
   const set = S.settings.pieceSet;
   let css = '';
   for (const c of ['w', 'b']) for (const [r, role] of Object.entries(ROLES)) {
-    css += `.cg-wrap piece.${role}.${c === 'w' ? 'white' : 'black'}{background-image:url('${pieceUrl(set, c + r.toUpperCase())}')}\n`;
+    css += `.cg-wrap piece.${role}.${c === 'w' ? 'white' : 'black'}, .mini piece.${role}.${c === 'w' ? 'white' : 'black'}{background-image:url('${pieceUrl(set, c + r.toUpperCase())}')}\n`;
   }
   $('piece-style').textContent = css;
 }
@@ -183,19 +216,40 @@ function updateBoard() {
   const chess = new Chess(fen);
   const turn = chess.turn() === 'w' ? 'white' : 'black';
   const lm = T ? (T.lastMove ? { from: T.lastMove[0], to: T.lastMove[1] } : null) : curLastMove();
+  // tryb partii: gracz ma stały kolor – poza swoim ruchem może planować premove'y (także łańcuch)
+  const player = T?.playerColor;
+  const myTurn = !player || player === turn;
+  const q = T?.premoves || [];
+  // ustawiamy pozycję tylko gdy naprawdę się zmieniła – inaczej bierki „skaczą” przy każdym odświeżeniu
+  const boardKey = fen + '|' + JSON.stringify(q) + '|' + (T ? 't' : 'a');
+  const fenChanged = boardKey !== updateBoard.key;
+  updateBoard.key = boardKey;
   cg.set({
-    fen,
+    ...(fenChanged ? { fen } : {}),
     orientation: T?.orientation || S.orientation,
     turnColor: turn,
     check: chess.inCheck() ? turn : false,
     lastMove: lm ? [lm.from, lm.to] : undefined,
-    movable: { color: chess.isGameOver() ? undefined : turn, dests: dests(chess) },
+    movable: { color: chess.isGameOver() || T?.locked ? undefined : (player || turn), dests: myTurn ? dests(chess) : new Map() },
+    premovable: { enabled: !!player && !T?.locked, showDests: true, castle: true, events: { set: (o, d) => T?.onPremove?.(o, d) } },
   });
+  // wizualnie zastosuj zaplanowane premove'y i podświetl ich pola
+  const hl = new Map();
+  for (const [o, d] of fenChanged ? q : []) {
+    const pc = cg.state.pieces.get(o);
+    if (!pc) continue;
+    const diff = new Map([[o, undefined], [d, pc.role === 'pawn' && (d[1] === '8' || d[1] === '1') ? { ...pc, role: 'queen' } : pc]]);
+    cg.setPieces(diff);
+    hl.set(o, 'premove-q'); hl.set(d, 'premove-q');
+  }
+  if (fenChanged) cg.set({ highlight: { custom: hl } });
   drawShapes();
 }
+// prawy klik na planszy anuluje zaplanowane premove'y
+$('board').addEventListener('contextmenu', (e) => { if (S.train?.premoves?.length) { e.preventDefault(); S.train.onPremoveCancel?.(); } });
 
 function drawShapes() {
-  if (S.editor) { cg.setAutoShapes([]); return; }
+  if (S.editor || document.querySelector('.app').hidden) { cg.setAutoShapes([]); return; }
   if (S.train) { cg.setAutoShapes(S.train.shapes || []); return; }
   const shapes = [];
   const fen = curFen();
@@ -311,14 +365,15 @@ function playUci(uci, opts = {}) {
   if (S.train) {
     const c = new Chess(S.train.fen);
     let tm;
-    try { tm = c.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), ...(uci[4] ? { promotion: uci[4] } : {}) }); } catch { updateBoard(); return false; }
+    try { tm = c.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), ...(uci[4] ? { promotion: uci[4] } : {}) }); } catch { updateBoard.key = null; updateBoard(); return false; }
+    updateBoard.key = null;
     S.train.onMove?.(tm.from + tm.to + (tm.promotion || ''), tm, c.fen());
     return true;
   }
   const fen = curFen();
   const chess = new Chess(fen);
   let m;
-  try { m = chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), ...(uci[4] ? { promotion: uci[4] } : {}) }); } catch { updateBoard(); return false; }
+  try { m = chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), ...(uci[4] ? { promotion: uci[4] } : {}) }); } catch { updateBoard.key = null; updateBoard(); return false; }
   const full = m.from + m.to + (m.promotion || '');
   if (S.retry && !opts.silent) { handleRetry(full, chess.fen(), m); return true; }
   if (!S.explore && S.game.moves[S.ply]?.uci === full) {
@@ -1342,7 +1397,7 @@ $('btn-token').onclick = async () => {
   scheduleExplorer(true);
 };
 
-$('snd-set').onchange = () => { sound.set = $('snd-set').value; store.set('soundSet', sound.set); sound.play('Move'); };
+$('snd-set').onchange = () => { sound.set = $('snd-set').value; store.set('soundSet', sound.set); sound.buffers.clear(); sound.loading.clear(); sound.preload(); sound.play('Move'); };
 $('snd-vol').oninput = () => { sound.vol = +$('snd-vol').value; store.set('soundVol', sound.vol); };
 $('snd-test').onclick = () => { const seq = ['Move', 'Capture', 'Check', 'Checkmate']; seq.forEach((n, i) => setTimeout(() => sound.play(n), i * 450)); };
 
@@ -1389,6 +1444,14 @@ document.querySelector('#an-menu .menu-list').onclick = (e) => {
   if (m === 'play') showTab('play');
 };
 
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-save]')) $('btn-save').click();
+  const g2 = e.target.closest('[data-go2], .sb-icons [data-go]');
+  if (!g2) return;
+  const go = g2.dataset.go2 || g2.dataset.go;
+  if (go === 'saved') { showTab('analysis'); setAnSub('menu'); $('an-saved').hidden = false; $('an-search').hidden = true; renderSaved(); }
+  else showTab(go);
+});
 // zapisane analizy
 $('btn-save').onclick = async () => {
   if (!S.game.moves.length) return toast('Nie ma czego zapisać.');
@@ -1493,6 +1556,7 @@ function openEditor(fen) {
 }
 function closeEditor() {
   S.editor = null;
+  updateBoard.key = null;
   cg.set({ movable: { free: false, showDests: true }, draggable: { deleteOnDropOff: false }, events: { change: undefined, select: undefined } });
   render();
 }
@@ -1614,21 +1678,21 @@ async function init() {
   setExplorerSrc(S.explorerSrc);
   refreshDbList().catch(() => {});
   initTraining({
-    S, render, sound, toast, badgeHtml, store, fetchUserPgns, terminalEval, catSays, showTab, markActive,
+    S, render, sound, toast, badgeHtml, store, fetchUserPgns, terminalEval, catSays, showTab, markActive, pushRating,
     miniBoard: (fen, o) => miniBoard(fen, o),
     openings: () => S.openings,
     engineId: () => $('review-engine').value,
     loadPgnText: (t) => { S.train = null; loadPgnText(t, { review: false }); },
   });
   HOME_API = {
-    store, profile, avatarHtml, streak, apiFetch, showTab, reviewPgn: (pgn) => { loadPgnText(pgn, { review: true }); showTab('report'); },
+    store, profile, avatarHtml, streak, apiFetch, showTab, pushRating, ratingHistory, reviewPgn: (pgn) => { loadPgnText(pgn, { review: true }); showTab('report'); },
     pieceUrl: (k) => pieceUrl(S.settings.pieceSet, k), repDue, repCoverFen, quickPlay, playBots, playCareer, playFriend, openPuzzles,
     openDrills: (id) => { showTab('study'); setStudySub('drills'); if (id) startDrill(id, 'learn'); },
   };
   initHome(HOME_API);
   initProfile({ store, toast, sound, showTab });
   initPlay({
-    S, render, sound, toast, store, catSays, profile, saveProfile, lichessToken, lichessUser, avatarHtml, markActive, showTab,
+    S, render, sound, toast, store, catSays, profile, saveProfile, lichessToken, lichessUser, avatarHtml, markActive, showTab, cg, pushRating,
     reviewPgn: (pgn) => { loadPgnText(pgn, { review: true }); showTab('report'); },
   });
   initStudy({

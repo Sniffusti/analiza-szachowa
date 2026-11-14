@@ -14,7 +14,8 @@
   <meta name="theme-color" content="#1e1e21">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..800&family=Geist+Mono:wght@400..700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400..800&family=Geist+Mono:wght@400..700&display=swap">
+  <script src="vendor/motion.js"></script>
   <link rel="stylesheet" href="vendor/chessground/chessground.base.css">
   <link rel="stylesheet" href="style.css">
   <style id="piece-style"></style>
@@ -25,17 +26,24 @@
   <aside class="sidebar">
     <div class="sb-brand"><img src="logo.png" alt=""><span>Analiza<b>.</b></span></div>
     <nav class="tabs">
-      <button data-tab="home"><span class="ni">⌂</span><em>Start</em></button>
-      <button data-tab="play"><span class="ni">♟</span><em>Graj</em></button>
-      <button data-tab="puzzles"><span class="ni">✦</span><em>Zadania</em></button>
-      <button data-tab="study"><span class="ni">❏</span><em>Ucz się</em></button>
-      <button data-tab="train"><span class="ni">♞</span><em>Trener</em></button>
-      <button data-tab="analysis"><span class="ni">⌕</span><em>Analiza</em></button>
-      <button data-tab="report" class="active"><span class="ni">▦</span><em>Przegląd</em></button>
-      <button data-tab="openings"><span class="ni">❖</span><em>Otwarcia</em></button>
-      <button data-tab="import"><span class="ni">⇩</span><em>Import</em></button>
-      <button data-tab="settings" class="sb-settings"><span class="ni">⚙</span><em>Ustawienia</em></button>
+      <button data-tab="home"><span class="ni" style="--c:#b9a2ff">⌂</span><em>Start</em></button>
+      <button data-tab="play"><span class="ni" style="--c:#f0a35e">♟</span><em>Graj</em></button>
+      <button data-tab="puzzles"><span class="ni" style="--c:#ef6b5b">✦</span><em>Zadania</em></button>
+      <button data-tab="study"><span class="ni" style="--c:#5aa9f0">❏</span><em>Ucz się</em></button>
+      <button data-tab="train"><span class="ni" style="--c:#7fbf5a">♞</span><em>Trener</em></button>
+      <button data-tab="analysis"><span class="ni" style="--c:#e7c04a">⌕</span><em>Analiza</em></button>
+      <button data-tab="report" class="active"><span class="ni" style="--c:#4fd1b5">▦</span><em>Przegląd</em></button>
+      <button data-tab="openings"><span class="ni" style="--c:#d58bf0">❖</span><em>Otwarcia</em></button>
+      <button data-tab="import"><span class="ni" style="--c:#9aa3b5">⇩</span><em>Import</em></button>
     </nav>
+    <div class="sb-account">
+      <button class="sb-user" id="sb-user" title="Twój profil"></button>
+      <div class="sb-icons">
+        <button data-go="saved" title="Zapisane analizy">♥</button>
+        <button data-go="import" title="Import partii">⇩</button>
+        <button data-go="settings" title="Ustawienia">⚙</button>
+      </div>
+    </div>
   </aside>
   <main class="main">
     <div class="tab page" id="tab-home" hidden></div>
@@ -102,6 +110,7 @@
           </div>
           <table class="summary" id="summary"></table>
           <div class="moves" id="moves"></div>
+          <div class="row"><button class="btn" data-save="1">♥ Zapisz analizę</button><button class="btn" data-go2="saved">Zapisane analizy</button></div>
         </div>
 
         <!-- ANALIZA -->
@@ -125,6 +134,7 @@
             </div>
             <div class="coach" id="coach-analysis" hidden></div>
             <div class="moves" id="moves-analysis"></div>
+            <div class="row"><button class="btn" data-save="1">♥ Zapisz analizę</button><button class="btn" data-go2="saved">Zapisane analizy</button></div>
             <p class="hint">Przesuń bierkę, żeby sprawdzić inny ruch. Kliknij ruch w linii silnika, żeby go zagrać.</p>
           </div>
 

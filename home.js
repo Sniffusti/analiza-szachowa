@@ -2,6 +2,7 @@
 import { Chess } from './vendor/chess.js';
 import { idb } from './store.js';
 import * as fx from './fx.js';
+import { ratingCards, bindCharts } from './charts.js';
 
 let A;
 export function initHome(api) { A = api; }
@@ -16,7 +17,8 @@ export function miniBoard(fen, { flip = false, size = '' } = {}) {
   order.forEach((row, y) => row.forEach((ch, x) => {
     const dark = (x + y) % 2 === 1;
     const piece = ch === '.' ? '' : (ch === ch.toUpperCase() ? 'w' : 'b') + ch.toUpperCase();
-    cells += `<i class="${dark ? 'd' : 'l'}">${piece ? `<img src="${A.pieceUrl(piece)}" alt="">` : ''}</i>`;
+    const ROLE = { P: 'pawn', N: 'knight', B: 'bishop', R: 'rook', Q: 'queen', K: 'king' };
+    cells += `<i class="${dark ? 'd' : 'l'}">${piece ? `<piece class="${ROLE[piece[1]]} ${piece[0] === 'w' ? 'white' : 'black'}"></piece>` : ''}</i>`;
   }));
   return `<div class="mini ${size}">${cells}</div>`;
 }
@@ -91,8 +93,13 @@ export async function renderHome(api) {
         <h4 style="margin-top:14px">Moje błędy</h4>
         <div class="muted">${mistakes.length} zadań z Twoich partii · ${dueMistakes} do powtórki</div>
         <button class="btn" data-h="mistakes" style="margin-top:8px;width:100%">Ćwicz błędy</button>
-        <h4 style="margin-top:14px">Rankingi zewnętrzne</h4>
-        <div class="ext-ratings" id="ext-ratings"><span class="muted">${p.chesscom || p.lichess ? 'Ładuję…' : 'Podaj nicki w profilu.'}</span></div>
+      </section>
+      <section class="hcard ratings-sec">
+        <div class="rs-head"><h4>Rankingi</h4><div class="rating-src" id="rating-src">
+          <button data-src="app" class="${A.store.get('ratingSrc', 'app') === 'app' ? 'on' : ''}">Ta aplikacja</button>
+          <button data-src="chesscom" class="${A.store.get('ratingSrc', 'app') === 'chesscom' ? 'on' : ''}">chess.com</button>
+          <button data-src="lichess" class="${A.store.get('ratingSrc', 'app') === 'lichess' ? 'on' : ''}">lichess</button></div></div>
+        <div id="rating-cards"><span class="muted">Ładuję…</span></div>
       </section>
       <section class="hcard history">
         <h4>Historia partii</h4>
@@ -135,6 +142,61 @@ export async function renderHome(api) {
   }).catch(() => { const box = document.getElementById('home-daily'); if (box) box.innerHTML = '<h4>Zadanie dnia</h4><p class="muted">Brak połączenia z lichess.</p>'; });
 
   extRatings(p).catch(() => {});
+  renderRatings(A.store.get('ratingSrc', 'app'));
+  document.getElementById('rating-src').onclick = (e) => {
+    const b = e.target.closest('[data-src]'); if (!b) return;
+    A.store.set('ratingSrc', b.dataset.src);
+    for (const x of document.querySelectorAll('#rating-src button')) x.classList.toggle('on', x === b);
+    renderRatings(b.dataset.src);
+  };
+}
+
+const ICONS = {
+  bullet: ['➶', '#e7a24a', 'Bullet'], blitz: ['⚡', '#f2c94c', 'Blitz'], rapid: ['⏱', '#7fbf5a', 'Szybkie'],
+  daily: ['☀', '#f5b041', 'Dzienne'], puzzle: ['✦', '#ef6b5b', 'Zadania'], career: ['♛', '#b9a2ff', 'Kariera'], bots: ['🐱', '#5aa9f0', 'Boty'],
+};
+function card(key, rating, history) {
+  const [icon, color, label] = ICONS[key];
+  const h = (history || []).filter((x) => x.v);
+  const delta = h.length >= 2 ? h[h.length - 1].v - h[Math.max(0, h.length - 11)].v : 0;
+  return { icon, color, label, rating, delta, history: h.length ? h : (rating ? [{ t: Date.now(), v: rating }] : []) };
+}
+async function renderRatings(src) {
+  const box = document.getElementById('rating-cards');
+  if (!box) return;
+  const p = A.profile();
+  let items = [];
+  try {
+    if (src === 'app') {
+      const pz = A.store.get('puzzleStats', { rating: 1500 });
+      items = [card('blitz', p.ratings.blitz, A.ratingHistory('blitz')), card('rapid', p.ratings.rapid, A.ratingHistory('rapid')), card('bullet', p.ratings.bullet, A.ratingHistory('bullet')),
+        card('puzzle', pz.rating, A.ratingHistory('puzzle')), card('career', p.career.rating, A.ratingHistory('career')), card('bots', p.rating, A.ratingHistory('bots'))];
+    } else if (src === 'lichess') {
+      if (!p.lichess) { box.innerHTML = '<p class="muted">Podaj nick z lichess w profilu (Ustawienia).</p>'; return; }
+      const key = 'liHist:' + p.lichess + ':' + new Date().toISOString().slice(0, 13);
+      let hist = A.store.get('liHistCache', null);
+      if (!hist || hist.key !== key) {
+        const r = await fetch(`https://lichess.org/api/user/${encodeURIComponent(p.lichess)}/rating-history`);
+        hist = { key, data: await r.json() };
+        A.store.set('liHistCache', hist);
+      }
+      const get = (name) => (hist.data.find((x) => x.name === name)?.points || []).map(([y, m, d, v]) => ({ t: new Date(y, m, d).getTime(), v })).slice(-120);
+      const last = (a) => a.length ? a[a.length - 1].v : null;
+      const map = { blitz: 'Blitz', rapid: 'Rapid', bullet: 'Bullet', daily: 'Correspondence', puzzle: 'Puzzles' };
+      items = Object.entries(map).map(([k, n]) => { const h = get(n); return card(k, last(h), h); }).filter((it) => it.rating);
+    } else {
+      if (!p.chesscom) { box.innerHTML = '<p class="muted">Podaj nick z chess.com w profilu (Ustawienia).</p>'; return; }
+      const r = await A.apiFetch('chesscom', `pub/player/${encodeURIComponent(p.chesscom.toLowerCase())}/stats`);
+      const j = await r.json();
+      const cur = { blitz: j.chess_blitz?.last?.rating, rapid: j.chess_rapid?.last?.rating, bullet: j.chess_bullet?.last?.rating, daily: j.chess_daily?.last?.rating, puzzle: j.tactics?.highest?.rating };
+      // chess.com nie udostępnia historii – zapisujemy własne migawki przy każdym wejściu
+      items = Object.entries(cur).filter(([, v]) => v).map(([k, v]) => { A.pushRating('cc:' + k, v); return card(k, v, A.ratingHistory('cc:' + k)); });
+    }
+  } catch (e) { box.innerHTML = `<p class="muted">Nie udało się pobrać rankingów (${esc(e.message)}).</p>`; return; }
+  box.innerHTML = items.length ? ratingCards(items) : `<p class="muted">${src === 'lichess' ? 'To konto na lichess nie ma jeszcze partii rankingowych.' : 'Brak rankingów.'}</p>`;
+  bindCharts(box);
+  fx.enter(box.querySelectorAll('.rcard'), { step: 50 });
+  for (const b of box.querySelectorAll('.rc-top b')) { const v = parseFloat(b.textContent); if (!isNaN(v)) fx.countUp(b, v, 0); }
 }
 
 async function extRatings(p) {

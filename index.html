@@ -12,6 +12,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Analiza">
   <meta name="theme-color" content="#1e1e21">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..800&family=Geist+Mono:wght@400..700&display=swap">
   <link rel="stylesheet" href="vendor/chessground/chessground.base.css">
   <link rel="stylesheet" href="style.css">
   <style id="piece-style"></style>
@@ -54,10 +57,15 @@
     </section>
 
     <section class="panel">
+      <header class="panel-head">
+        <div class="brand"><span class="logo">♞</span>ANALIZA.<small>SZACHY · PRZEGLĄD PARTII</small></div>
+      </header>
+      <div class="strip"><span class="dot"></span><span id="strip-engine">Silnik: –</span><span class="sep">|</span><span id="strip-mode">Tryb: analiza</span><span id="strip-game"></span></div>
       <nav class="tabs">
         <button data-tab="report" class="active"><span>▦</span>Raport</button>
         <button data-tab="analysis"><span>⌕</span>Analiza</button>
         <button data-tab="openings"><span>❖</span>Otwarcia</button>
+        <button data-tab="train"><span>♞</span>Trening</button>
         <button data-tab="import"><span>⇩</span>Import</button>
         <button data-tab="settings"><span>⚙</span>Ustawienia</button>
       </nav>
@@ -65,6 +73,8 @@
       <div class="tab-body">
         <!-- RAPORT -->
         <div class="tab" id="tab-report">
+          <div class="eyebrow">Przegląd partii</div>
+          <div class="sec-title">Raport <span>/ ocena ruchów</span></div>
           <div class="review-start" id="review-start">
             <label>Silnik <select id="review-engine"></select></label>
             <label id="review-depth-wrap">Głębokość <input type="number" id="review-depth" min="8" max="30" value="18"></label>
@@ -74,13 +84,18 @@
           <div class="progress" id="review-progress" hidden><div id="review-progress-bar"></div><span id="review-progress-text"></span></div>
 
           <div class="coach" id="coach" hidden></div>
-          <div class="graph" id="graph"></div>
+          <div class="graph-card">
+            <div class="eyebrow"><span>Przewaga w partii</span><span class="pill" id="graph-pill">białe ▲ · czarne ▼</span></div>
+            <div class="graph" id="graph"><div class="graph-tip" id="graph-tip" hidden></div></div>
+          </div>
           <table class="summary" id="summary"></table>
           <div class="moves" id="moves"></div>
         </div>
 
         <!-- ANALIZA -->
         <div class="tab" id="tab-analysis" hidden>
+          <div class="eyebrow">Silnik na żywo</div>
+          <div class="sec-title">Analiza <span>/ sprawdź każdy ruch</span></div>
           <div class="live-head">
             <label class="switch"><input type="checkbox" id="live-on" checked><span></span> Silnik</label>
             <select id="live-engine"></select>
@@ -95,6 +110,8 @@
 
         <!-- OTWARCIA -->
         <div class="tab" id="tab-openings" hidden>
+          <div class="eyebrow">Drzewo debiutowe</div>
+          <div class="sec-title">Otwarcia <span>/ eksplorator</span></div>
           <div class="opening-name" id="opening-name">–</div>
           <div class="seg" id="explorer-source">
             <button data-src="masters" class="active">Mistrzowie</button>
@@ -110,7 +127,7 @@
             <div class="row">
               <select id="tree-site"><option value="chesscom">Chess.com</option><option value="lichess">Lichess</option></select>
               <input id="tree-user" placeholder="nazwa użytkownika">
-              <select id="tree-limit"><option value="100">100 partii</option><option value="300" selected>300 partii</option><option value="1000">1000 partii</option></select>
+              <select id="tree-limit"><option value="100">100 partii</option><option value="300" selected>300 partii</option><option value="1000">1000 partii</option><option value="all">Wszystkie partie</option></select>
               <button class="btn primary" id="btn-tree">Zbuduj</button>
             </div>
             <div class="seg small" id="tree-color">
@@ -120,18 +137,91 @@
             <div class="muted" id="tree-status"></div>
           </div>
           <div class="explorer-opts" id="opts-mydb" hidden>
-            <p class="muted">Baza z ChessBase: w ChessBase otwórz bazę → zaznacz partie → <b>Plik → Eksport → PGN</b>. Potem wczytaj ten plik tutaj (działa też dla baz z innych programów, np. Mega Database po eksporcie).</p>
             <div class="row">
-              <label class="btn file">Wczytaj bazę .pgn<input type="file" id="db-file" accept=".pgn,.txt" hidden></label>
+              <select id="db-list" style="flex:1"></select>
+              <button class="btn" id="db-del" title="Usuń wybraną bazę">Usuń</button>
+            </div>
+            <div class="row">
+              <label class="btn primary file">＋ Dodaj bazy .pgn<input type="file" id="db-file" accept=".pgn,.txt,.cbh,.2cbh,.cbv" multiple hidden></label>
               <select id="db-plies"><option value="20">20 półruchów</option><option value="30" selected>30 półruchów</option><option value="50">50 półruchów</option></select>
             </div>
+            <p class="muted">Bazy zapisują się w przeglądarce i są dostępne po ponownym otwarciu. Pliki ChessBase (.2cbh, .cbh) mają zamknięty format: w ChessBase zaznacz partie → <b>Plik → Eksport → PGN</b> i dodaj ten .pgn.</p>
             <div class="muted" id="db-status"></div>
           </div>
           <div class="explorer" id="explorer"></div>
         </div>
 
+        <!-- TRENING -->
+        <div class="tab" id="tab-train" hidden>
+          <div class="eyebrow">Ćwiczenia</div>
+          <div class="sec-title">Trening <span>/ zadania, drille, trener</span></div>
+          <div class="seg" id="train-sub">
+            <button data-sub="puzzles" class="active">Zadania</button>
+            <button data-sub="mistakes">Moje błędy</button>
+            <button data-sub="drills">Drille</button>
+            <button data-sub="tutor">Trener</button>
+          </div>
+
+          <div class="train-pane" id="train-puzzles">
+            <div class="row">
+              <select id="pz-theme" style="flex:1"></select>
+              <select id="pz-diff">
+                <option value="easiest">Najłatwiejsze</option><option value="easier">Łatwiejsze</option>
+                <option value="normal" selected>Normalne</option><option value="harder">Trudniejsze</option><option value="hardest">Najtrudniejsze</option>
+              </select>
+              <button class="btn primary" id="pz-start">Start</button>
+            </div>
+            <div class="muted" id="pz-stats"></div>
+            <div class="pz-box" id="pz-box"></div>
+            <p class="muted">Zadania pochodzą z bazy lichess (lichess.org/training) – wymagają internetu.</p>
+          </div>
+
+          <div class="train-pane" id="train-mistakes" hidden>
+            <div class="muted" id="mk-info"></div>
+            <div class="row"><button class="btn primary" id="mk-start">Następny błąd</button><button class="btn" id="mk-clear">Wyczyść listę</button></div>
+            <div class="pz-box" id="mk-box"></div>
+            <p class="muted">Każdy błąd wraca jak fiszka: rozwiązany – za 1, 3, 7, 14… dni; nierozwiązany – za 10 minut.</p>
+          </div>
+
+          <div class="train-pane" id="train-drills" hidden>
+            <div id="rep-list"></div>
+            <div class="drill-box" id="drill-box" hidden>
+              <div class="pz-status" id="drill-status"></div>
+              <div class="row"><button class="btn" id="drill-hint">Podpowiedź</button><button class="btn" id="drill-restart">Nowa linia</button><button class="btn" id="drill-stop">Zakończ</button></div>
+            </div>
+            <h3>Nowy drill</h3>
+            <div class="row">
+              <input id="rep-name" placeholder="Nazwa, np. Gambit wiedeński">
+              <select id="rep-color"><option value="w">Gram białymi</option><option value="b">Gram czarnymi</option></select>
+            </div>
+            <div class="row"><label class="btn file">Pliki PGN z wariantami<input type="file" id="rep-file" accept=".pgn,.txt" multiple hidden></label>
+              <label class="check"><input type="checkbox" id="rep-from-game"> bieżąca partia / wariant</label></div>
+            <textarea id="rep-pgn" rows="3" placeholder="…albo wklej PGN z wariantami, np. 1. e4 e5 2. Nc3 Nf6 (2... Nc6 3. Bc4) 3. f4"></textarea>
+            <div class="row"><button class="btn primary" id="rep-create">Utwórz drill</button></div>
+            <p class="muted">Jak w ChessBase: program gra ruchy przeciwnika z repertuaru, a Ty musisz odpowiadać swoimi. Częściej wracają pozycje, w których się mylisz. Z ChessBase: zaznacz partie/rozdziały → Plik → Eksport → PGN (warianty zostają).</p>
+          </div>
+
+          <div class="train-pane" id="train-tutor" hidden>
+            <div class="row">
+              <select id="tu-site"><option value="chesscom">Chess.com</option><option value="lichess">Lichess</option></select>
+              <input id="tu-user" placeholder="nazwa użytkownika">
+            </div>
+            <div class="row">
+              <select id="tu-count"><option value="5">5 partii</option><option value="25">25 partii</option><option value="50" selected>50 partii</option><option value="100">100 partii</option><option value="200">200 partii</option><option value="all">Wszystkie</option></select>
+              <select id="tu-speed"><option value="all">Każde tempo</option><option value="bullet">Bullet</option><option value="blitz">Blitz</option><option value="rapid">Rapid</option><option value="classical">Klasyczne</option><option value="daily">Korespondencyjne</option></select>
+              <label class="muted">Głębokość <input type="number" id="tu-depth" value="12" min="8" max="20" style="width:60px"></label>
+            </div>
+            <div class="row"><button class="btn primary" id="tu-run">Analizuj moje partie</button></div>
+            <div class="progress" id="tu-progress" hidden><div id="tu-bar"></div></div>
+            <div class="muted" id="tu-status"></div>
+            <div id="tu-report"></div>
+          </div>
+        </div>
+
         <!-- IMPORT -->
         <div class="tab" id="tab-import" hidden>
+          <div class="eyebrow">Wczytywanie partii</div>
+          <div class="sec-title">Import <span>/ PGN, lichess, chess.com</span></div>
           <h3>PGN / FEN</h3>
           <textarea id="pgn-input" rows="6" placeholder="Wklej PGN (lub FEN pozycji)…"></textarea>
           <div class="row">
@@ -156,6 +246,8 @@
 
         <!-- USTAWIENIA -->
         <div class="tab" id="tab-settings" hidden>
+          <div class="eyebrow">Wygląd i konto</div>
+          <div class="sec-title">Ustawienia <span>/ bierki, plansze, dźwięki</span></div>
           <h3>Zestaw bierek</h3>
           <div class="grid pieces" id="piece-grid"></div>
           <h3>Szachownica</h3>

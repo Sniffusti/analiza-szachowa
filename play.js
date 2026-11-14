@@ -4,6 +4,7 @@ import { Chess } from './vendor/chess.js';
 import { Engine } from './engine.js';
 import { idb } from './store.js';
 import * as fx from './fx.js';
+import { materialHtml } from './material.js';
 
 let A;
 const $ = (id) => document.getElementById(id);
@@ -48,6 +49,7 @@ function view() {
   const live = G.on && G.mode !== 'review';
   A.S.train = {
     fen: G.chess.fen(), lastMove: G.last, orientation: G.color === 'w' ? 'white' : 'black', hideEval: true, shapes: [], onMove: onUserMove,
+    players: G.headers,
     playerColor: live ? (G.color === 'w' ? 'white' : 'black') : undefined,
     premoves: live ? G.queue || [] : [],
     onPremove: (o, d) => { (G.queue ||= []).push([o, d]); A.cg.cancelPremove(); view(); },
@@ -79,7 +81,7 @@ function playerRow(side) {
   const ava = me ? A.avatarHtml(p, 30) : `<img class="ava" src="${G.oppAva || 'cat.png'}" width="30" height="30" alt="" onerror="this.src='cat.png'">`;
   const rating = me ? G.myRating : G.oppRating;
   const turn = G.on && G.chess.turn() === side;
-  return `<div class="clock ${me ? 'me' : ''} ${turn ? 'run' : ''}"><span class="who">${ava}<span>${esc(name)} <small class="mono">${rating ?? ''}</small></span></span><b>${G.clocks ? fmtClock(G.clocks[side]) : ''}</b></div>`;
+  return `<div class="clock ${me ? 'me' : ''} ${turn ? 'run' : ''}"><span class="who">${ava}<span>${esc(name)} <small class="mono">${rating ?? ''}</small>${materialHtml(G.chess.fen(), side)}</span></span><b>${G.clocks ? fmtClock(G.clocks[side]) : ''}</b></div>`;
 }
 function renderClocks() {
   const opp = G.color === 'w' ? 'b' : 'w';

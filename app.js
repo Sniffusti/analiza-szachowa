@@ -5,6 +5,7 @@ import * as C from './classify.js';
 import { splitGames, buildGame, gameFromFen, parseHeaders } from './pgn.js';
 import { idb } from './store.js';
 import * as fx from './fx.js';
+import { materialHtml } from './material.js';
 import { initTraining, onShowTab, addMistakesFromReview, drills, openPuzzles, repDue, repCoverFen, startDrill } from './train.js';
 import { initHome, renderHome, miniBoard } from './home.js';
 import { initStudy, onShowStudyTab, catSays, setStudySub } from './study.js';
@@ -169,7 +170,7 @@ function applyPieceSet() {
   const set = S.settings.pieceSet;
   let css = '';
   for (const c of ['w', 'b']) for (const [r, role] of Object.entries(ROLES)) {
-    css += `.cg-wrap piece.${role}.${c === 'w' ? 'white' : 'black'}, .mini piece.${role}.${c === 'w' ? 'white' : 'black'}{background-image:url('${pieceUrl(set, c + r.toUpperCase())}')}\n`;
+    css += `.cg-wrap piece.${role}.${c === 'w' ? 'white' : 'black'}, .mini piece.${role}.${c === 'w' ? 'white' : 'black'}, .mat piece.${role}.${c === 'w' ? 'white' : 'black'}{background-image:url('${pieceUrl(set, c + r.toUpperCase())}')}\n`;
   }
   $('piece-style').textContent = css;
 }
@@ -455,15 +456,17 @@ function renderEvalBar() {
 }
 
 function renderPlayers() {
-  const h = S.game.headers;
-  const w = `${esc(h.White || 'Białe')} <small>${esc(h.WhiteElo || '')}</small>`;
-  const b = `${esc(h.Black || 'Czarne')} <small>${esc(h.BlackElo || '')}</small>`;
-  $('strip-game').textContent = `${h.White || 'Białe'} – ${h.Black || 'Czarne'}${h.Date && !h.Date.startsWith('?') ? ' · ' + h.Date : ''}`;
-  $('strip-mode').textContent = S.train ? 'Tryb: trening' : S.explore ? 'Tryb: wariant' : S.review ? 'Tryb: raport' : 'Tryb: analiza';
-  $('player-top').innerHTML = S.orientation === 'white' ? '♚ ' + b : '♔ ' + w;
-  $('player-bottom').innerHTML = S.orientation === 'white' ? '♔ ' + w : '♚ ' + b;
+  const T = S.train;
+  const h = T?.players || S.game.headers;
+  const fen = T ? T.fen : curFen();
+  const orient = T?.orientation || S.orientation;
+  const w = `${esc(h.White || 'Białe')} <small>${esc(h.WhiteElo || '')}</small>${materialHtml(fen, 'w')}`;
+  const b = `${esc(h.Black || 'Czarne')} <small>${esc(h.BlackElo || '')}</small>${materialHtml(fen, 'b')}`;
+  $('strip-game').textContent = `${h.White || 'Białe'} – ${h.Black || 'Czarne'}${h.Date && !String(h.Date).startsWith('?') ? ' · ' + h.Date : ''}`;
+  $('strip-mode').textContent = T ? 'Tryb: trening' : S.explore ? 'Tryb: wariant' : S.review ? 'Tryb: raport' : 'Tryb: analiza';
+  $('player-top').innerHTML = orient === 'white' ? '♚ ' + b : '♔ ' + w;
+  $('player-bottom').innerHTML = orient === 'white' ? '♔ ' + w : '♚ ' + b;
 }
-
 
 function variationHtml() {
   const e = S.explore;

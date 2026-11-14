@@ -5,7 +5,10 @@ import * as C from './classify.js';
 import { splitGames, buildGame, gameFromFen, parseHeaders } from './pgn.js';
 import { idb } from './store.js';
 import * as fx from './fx.js';
-import { initTraining, onShowTab, addMistakesFromReview } from './train.js';
+import { initTraining, onShowTab, addMistakesFromReview, drills } from './train.js';
+import { initStudy, onShowStudyTab, catSays } from './study.js';
+import { initPlay, onShowPlayTab } from './play.js';
+import { initProfile, profile, saveProfile, lichessToken, lichessUser } from './profile.js';
 
 // ---------- narzędzia ----------
 const $ = (id) => document.getElementById(id);
@@ -173,6 +176,7 @@ function badgeHtml(cls, size = 18) {
 }
 
 function updateBoard() {
+  if (S.editor) return;
   const T = S.train;
   const fen = T ? T.fen : curFen();
   const chess = new Chess(fen);
@@ -190,6 +194,7 @@ function updateBoard() {
 }
 
 function drawShapes() {
+  if (S.editor) { cg.setAutoShapes([]); return; }
   if (S.train) { cg.setAutoShapes(S.train.shapes || []); return; }
   const shapes = [];
   const fen = curFen();
@@ -292,6 +297,7 @@ function choosePromotion(color) {
 }
 
 async function onUserMove(orig, dest) {
+  if (S.editor) { syncEditorFen(); return; }
   const chess = new Chess(S.train ? S.train.fen : curFen());
   const piece = chess.get(orig);
   let promotion;
@@ -484,8 +490,8 @@ function setCoach(html, color) {
     const box = $(id);
     if (!html) { box.hidden = true; continue; }
     box.hidden = false;
-    box.style.borderLeftColor = color;
-    box.innerHTML = html;
+    box.style.setProperty('--mood', color);
+    box.innerHTML = catSays(html);
   }
 }
 function renderCoach() {
@@ -799,7 +805,7 @@ function renderLive(done) {
   const top = lines[0];
   const name = $('live-engine').selectedOptions[0]?.textContent || '';
   $('strip-engine').textContent = top ? `Silnik: ${name.replace(/\s*\(.*\)/, '')} · gł. ${top.depth}` : `Silnik: ${name.replace(/\s*\(.*\)/, '')} · liczę…`;
-  $('live-status').textContent = top ? `${name} · głębokość ${top.depth}${top.nodes ? ' · ' + (top.nodes / 1000).toFixed(0) + 'k węzłów' : ''}${done ? ' · koniec' : ''}` : 'Liczę…';
+  $('live-status').textContent = top ? `depth=${top.depth} | ${name.replace(/\s*\(.*\)/, '')}` : 'liczę…';
   let html = '';
   for (const l of lines) {
     if (!l) continue;
@@ -810,12 +816,12 @@ function renderLive(done) {
     steps.forEach((s, i) => {
       if (white) pv += `<em class="muted">${no}.</em>`;
       else if (i === 0) pv += `<em class="muted">${no}…</em>`;
-      pv += `<span data-n="${i + 1}">${esc(s.san)}</span> `;
+      pv += `<span data-n="${i + 1}">${figurine(s.san, s.move.color)}</span> `;
       if (!white) no++;
       white = !white;
     });
     const wp = C.winPct(l);
-    html += `<div class="line" data-pv="${l.pv.join(' ')}"><span class="score ${wp >= 50 ? 'w' : 'b'}">${C.formatEval(l)}</span><span class="pv">${pv}</span></div>`;
+    html += `<div class="line" data-pv="${l.pv.join(' ')}"><span class="score ${wp >= 50 ? 'w' : 'b'}">${C.formatEval(l)}</span><span class="pv">${pv}</span><span class="chev">›</span></div>`;
   }
   $('lines').innerHTML = html;
 }
@@ -844,6 +850,8 @@ function renderOpeningName() {
   for (let p = S.explore ? S.explore.base : S.ply; p >= 0; p--) fens.push(posFen(p));
   for (const f of fens) { const o = S.openings[epd(f)]; if (o) { name = o; break; } }
   $('opening-name').innerHTML = name ? `<small>${esc(name.e)}</small>${esc(name.n)}` : '<span class="muted">Pozycja spoza bazy otwarć</span>';
+  $('engine-opening').innerHTML = name ? `◎ <b>${esc(name.e)}</b> ${esc(name.n)}` : (curFen() === new Chess().fen() ? '◎ <span class="muted">Pozycja początkowa</span>' : '◎ <span class="muted">Pozycja spoza książki debiutów</span>');
+  if (!$('an-book').hidden) renderBook();
 }
 
 const SPEEDS = ['bullet', 'blitz', 'rapid', 'classical', 'correspondence'];
@@ -1077,6 +1085,7 @@ async function loadDatabase(text, name) {
 
 // ---------- import ----------
 function setGame(game) {
+  if (S.game?.moves?.length) store.set('prevPgn', exportPgn());
   reviewEngine.stop();
   S.reviewing = false;
   S.game = game;
@@ -1263,6 +1272,7 @@ $('btn-flip').onclick = () => { S.orientation = S.orientation === 'white' ? 'bla
 $('btn-new').onclick = () => { setGame(gameFromFen(new Chess().fen())); showTab('analysis'); };
 document.addEventListener('keydown', (e) => {
   if (e.target.matches('input, textarea, select')) return;
+  if (S.train?.onKey?.(e.key)) { e.preventDefault(); return; }
   if (e.key === 'ArrowLeft') { go(-1); e.preventDefault(); }
   else if (e.key === 'ArrowRight') { go(1); e.preventDefault(); }
   else if (e.key === 'Home') $('nav-first').click();
@@ -1280,7 +1290,11 @@ function showTab(name) {
   if (name === 'openings') scheduleExplorer(true);
   if (name === 'report') renderGraph();
   renderMoves();
+  if (S.editor && name !== 'analysis') closeEditor();
+  if (S.train) { S.train = null; render(); }
   onShowTab(name);
+  onShowStudyTab(name);
+  onShowPlayTab(name);
   fx.enter(document.querySelectorAll(`#tab-${name} > *`), { step: 30, dist: 6 });
 }
 document.querySelector('.tabs').onclick = (e) => { const b = e.target.closest('[data-tab]'); if (b) showTab(b.dataset.tab); };
@@ -1325,6 +1339,236 @@ $('snd-set').onchange = () => { sound.set = $('snd-set').value; store.set('sound
 $('snd-vol').oninput = () => { sound.vol = +$('snd-vol').value; store.set('soundVol', sound.vol); };
 $('snd-test').onclick = () => { const seq = ['Move', 'Capture', 'Check', 'Checkmate']; seq.forEach((n, i) => setTimeout(() => sound.play(n), i * 450)); };
 
+// ---------- figurki ----------
+const FIG = { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘' };
+function figurine(san) {
+  const p = san[0];
+  return FIG[p] ? `<i class="fig">${FIG[p]}</i>${esc(san.slice(1))}` : esc(san);
+}
+
+// ---------- zakładka Analiza: podzakładki ----------
+function setAnSub(sub) {
+  for (const b of $('an-sub').children) b.classList.toggle('active', b.dataset.sub === sub);
+  for (const id of ['engine', 'menu', 'book', 'editor']) $('an-' + id).hidden = id !== sub;
+  if (sub !== 'editor' && S.editor) closeEditor();
+  if (sub === 'book') renderBook();
+  if (sub === 'menu') { $('an-search').hidden = true; $('an-saved').hidden = true; }
+  fx.enter(document.querySelectorAll(`#an-${sub} > *`), { step: 25 });
+}
+$('an-sub').onclick = (e) => { const s = e.target.dataset.sub; if (s) setAnSub(s); };
+
+async function loadAny(text) {
+  text = text.trim();
+  if (!text) return;
+  if (/lichess\.org\/study\//.test(text)) { showTab('study'); $('study-url').value = text; $('study-import').click(); return; }
+  if (/lichess\.org\/[a-zA-Z0-9]{8}/.test(text)) { $('li-user').value = text; $('btn-li').click(); showTab('report'); return; }
+  loadPgnText(text, { review: false });
+  goTo(S.game.moves.length);
+  showTab('analysis');
+  setAnSub('engine');
+}
+$('an-load').onclick = $('an-paste-go').onclick = () => loadAny($('an-paste').value);
+$('an-paste').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadAny($('an-paste').value); });
+$('an-prev').onclick = () => { const p = store.get('prevPgn', ''); if (!p) return toast('Brak poprzedniej partii.'); loadPgnText(p, { review: false }); showTab('analysis'); setAnSub('engine'); };
+document.querySelector('#an-menu .menu-list').onclick = (e) => {
+  const m = e.target.closest('[data-m]')?.dataset.m;
+  if (!m) return;
+  if (m === 'editor') openEditor();
+  if (m === 'new') { setGame(gameFromFen(new Chess().fen())); setAnSub('engine'); }
+  if (m === 'collections') { setExplorerSrc('mydb'); showTab('openings'); }
+  if (m === 'search') { $('an-search').hidden = false; $('an-saved').hidden = true; $('an-search-q').focus(); }
+  if (m === 'book') setAnSub('book');
+  if (m === 'saved') { $('an-saved').hidden = false; $('an-search').hidden = true; renderSaved(); }
+  if (m === 'play') showTab('play');
+};
+
+// zapisane analizy
+$('btn-save').onclick = async () => {
+  if (!S.game.moves.length) return toast('Nie ma czego zapisać.');
+  const h = S.game.headers;
+  const name = prompt('Nazwa analizy:', `${h.White || 'Białe'} – ${h.Black || 'Czarne'}${h.Date ? ' ' + h.Date : ''}`);
+  if (name === null) return;
+  const id = Date.now().toString(36);
+  await idb.set('saved:' + id, { id, name: name || 'Analiza', date: new Date().toISOString().slice(0, 10), pgn: exportPgn() });
+  sound.play('Confirmation');
+  toast('Zapisano w „Analiza → Menu → Zapisane analizy”.');
+};
+async function renderSaved() {
+  const keys = await idb.keys('saved:');
+  const items = (await Promise.all(keys.map((k) => idb.get(k)))).filter(Boolean).sort((a, b) => b.id.localeCompare(a.id));
+  $('an-saved-list').innerHTML = items.length ? items.map((it) => `<div class="rep-item" data-sv="${it.id}"><div><b>${esc(it.name)}</b> <span class="muted">${esc(it.date)}</span></div><div class="rep-btns"><button class="btn primary" data-a="open">Otwórz</button><button class="btn" data-a="del">✕</button></div></div>`).join('')
+    : '<p class="muted">Brak zapisanych analiz. Użyj ♥ pod szachownicą, żeby zapisać bieżącą partię.</p>';
+}
+$('an-saved-list').onclick = async (e) => {
+  const id = e.target.closest('[data-sv]')?.dataset.sv; const a = e.target.closest('[data-a]')?.dataset.a;
+  if (!id || !a) return;
+  const it = await idb.get('saved:' + id);
+  if (a === 'open') { loadPgnText(it.pgn, { review: false }); showTab('analysis'); setAnSub('engine'); }
+  if (a === 'del' && confirm(`Usunąć „${it.name}”?`)) { await idb.del('saved:' + id); renderSaved(); }
+};
+
+// wyszukiwanie w bazach
+$('an-search-go').onclick = async () => {
+  const q = $('an-search-q').value.trim().toLowerCase();
+  if (!q) return;
+  const st = $('an-search-status');
+  st.textContent = 'Szukam…';
+  const results = [];
+  const sources = [...(await idb.keys('db:')), ...(await idb.keys('saved:'))];
+  for (const k of sources) {
+    const v = await idb.get(k);
+    const text = typeof v === 'string' ? v : v?.pgn || '';
+    for (const pgn of splitGames(text)) {
+      const h = parseHeaders(pgn);
+      const hay = [h.White, h.Black, h.Event, h.Opening, h.ECO, h.Site, h.Date].join(' ').toLowerCase();
+      if (hay.includes(q)) results.push({ pgn, h });
+      if (results.length >= 200) break;
+    }
+    if (results.length >= 200) break;
+  }
+  st.textContent = results.length ? `Znaleziono ${results.length}${results.length >= 200 ? '+' : ''} partii.` : 'Nic nie znaleziono (szukam w bazach PGN i zapisanych analizach).';
+  const list = $('an-search-list');
+  list.innerHTML = results.map((it, i) => `<div class="game-item" data-i="${i}"><div>${esc(it.h.White)} – ${esc(it.h.Black)}</div><div class="res">${esc(it.h.Result || '*')}</div><div class="meta">${esc([it.h.Date, it.h.ECO, it.h.Event].filter(Boolean).join(' · '))}</div></div>`).join('');
+  list.onclick = (ev) => { const it = ev.target.closest('[data-i]'); if (it) { loadPgnText(results[+it.dataset.i].pgn, { review: false }); showTab('analysis'); setAnSub('engine'); } };
+};
+
+// ---------- edytor pozycji ----------
+const ED_PIECES = ['wK', 'wQ', 'wR', 'wB', 'wN', 'wP', 'bK', 'bQ', 'bR', 'bB', 'bN', 'bP'];
+function renderPalette() {
+  $('ed-palette').innerHTML = ['hand', ...ED_PIECES, 'trash'].map((p) => {
+    const on = (S.editor?.sel || 'hand') === p;
+    if (p === 'hand') return `<button data-p="hand" class="${on ? 'on' : ''}" title="Przesuwanie">✋</button>`;
+    if (p === 'trash') return `<button data-p="trash" class="${on ? 'on' : ''}" title="Gumka">⌫</button>`;
+    return `<button data-p="${p}" class="${on ? 'on' : ''}" style="background-image:url('${pieceUrl(S.settings.pieceSet, p)}')"></button>`;
+  }).join('');
+}
+function syncEditorFen() {
+  if (!S.editor) return;
+  const board = cg.getFen();
+  const castle = (board.split('/')[7].startsWith('R') && board.split('/')[7].slice(4, 5) === 'K' ? '' : '');
+  void castle;
+  const rows = board.split('/');
+  const r1 = rows[7].replace(/\d/g, (d) => '.'.repeat(+d)), r8 = rows[0].replace(/\d/g, (d) => '.'.repeat(+d));
+  let c = '';
+  if (r1[4] === 'K' && r1[7] === 'R') c += 'K';
+  if (r1[4] === 'K' && r1[0] === 'R') c += 'Q';
+  if (r8[4] === 'k' && r8[7] === 'r') c += 'k';
+  if (r8[4] === 'k' && r8[0] === 'r') c += 'q';
+  $('ed-fen').value = `${board} ${$('ed-turn').value} ${c || '-'} - 0 1`;
+}
+function openEditor(fen) {
+  if (S.train) { S.train = null; }
+  S.editor = { sel: 'hand' };
+  setAnSub('editor');
+  S.editor = { sel: 'hand' };
+  const f = fen || curFen();
+  $('ed-turn').value = f.split(' ')[1] || 'w';
+  cg.set({
+    fen: f, lastMove: undefined, check: false, orientation: S.orientation,
+    movable: { free: true, color: 'both', dests: undefined, showDests: false },
+    draggable: { deleteOnDropOff: true },
+    events: {
+      change: syncEditorFen,
+      select: (key) => {
+        const sel = S.editor?.sel;
+        if (!sel || sel === 'hand') return;
+        const m = new Map();
+        m.set(key, sel === 'trash' ? undefined : { color: sel[0] === 'w' ? 'white' : 'black', role: ROLES[sel[1].toLowerCase()] });
+        cg.setPieces(m);
+        cg.selectSquare(null);
+        syncEditorFen();
+      },
+    },
+  });
+  cg.setAutoShapes([]);
+  renderPalette();
+  syncEditorFen();
+}
+function closeEditor() {
+  S.editor = null;
+  cg.set({ movable: { free: false, showDests: true }, draggable: { deleteOnDropOff: false }, events: { change: undefined, select: undefined } });
+  render();
+}
+$('ed-palette').onclick = (e) => { const p = e.target.closest('[data-p]')?.dataset.p; if (p && S.editor) { S.editor.sel = p; renderPalette(); } };
+$('ed-turn').onchange = syncEditorFen;
+$('ed-fen').addEventListener('change', () => { try { const c = new Chess($('ed-fen').value); cg.set({ fen: c.fen() }); } catch { toast('Niepoprawny FEN'); } });
+$('an-editor').addEventListener('click', (e) => {
+  const a = e.target.closest('[data-ed]')?.dataset.ed;
+  if (!a) return;
+  if (a === 'start') { cg.set({ fen: new Chess().fen() }); $('ed-turn').value = 'w'; syncEditorFen(); }
+  if (a === 'clear') { cg.set({ fen: '8/8/8/8/8/8/8/8' }); syncEditorFen(); }
+  if (a === 'flip') { cg.toggleOrientation(); S.orientation = cg.state.orientation; }
+  if (a === 'cancel') { closeEditor(); setAnSub('menu'); }
+  if (a === 'done') {
+    const fen = $('ed-fen').value;
+    let ok = true;
+    try { new Chess(fen); } catch (err) { ok = false; toast('Ta pozycja jest niepoprawna: ' + (err.message || '').replace('Invalid FEN: ', ''), 4500); }
+    if (!ok) return;
+    closeEditor();
+    setGame(gameFromFen(fen));
+    setAnSub('engine');
+  }
+});
+
+// ---------- książeczka debiutów ----------
+let BOOK = null;
+async function loadBook() { if (!BOOK) BOOK = await fetch('data/book.json').then((r) => r.json()); return BOOK; }
+async function renderBook() {
+  const book = await loadBook();
+  const fen = curFen();
+  const key = epd(fen);
+  const named = S.openings[key];
+  let deepest = null;
+  for (let p = S.explore ? S.explore.base : S.ply; p >= 0 && !deepest; p--) deepest = S.openings[epd(posFen(p))];
+  const cur = named || deepest;
+  $('book-cur').innerHTML = cur ? `<span class="pill accent">${esc(cur.e)}</span><div class="book-name">${esc(cur.n)}</div>${named ? '' : '<div class="muted">Wyszedłeś już z książki – pokazuję ostatnie znane otwarcie.</div>'}` : '<div class="book-name">Pozycja początkowa</div>';
+  const sans = (book.tree[key] || '').split(' ').filter(Boolean);
+  const rows = sans.map((san) => {
+    const c = new Chess(fen);
+    let m; try { m = c.move(san); } catch { return ''; }
+    const after = S.openings[epd(c.fen())];
+    // najgłębsza nazwa w dalszej linii
+    let hint = after;
+    if (!hint) {
+      const line = book.list.find((l) => l[2].startsWith(movesSoFar().concat(san).join(' ')));
+      if (line) hint = { e: line[0], n: line[1] };
+    }
+    return `<button class="book-move" data-uci="${m.from + m.to + (m.promotion || '')}"><b>${figurine(m.san)}</b><span>${hint ? esc(hint.n) : ''}</span><small>${hint ? esc(hint.e) : ''}</small></button>`;
+  }).join('');
+  $('book-moves').innerHTML = rows || '<p class="muted">Brak dalszych ruchów książkowych w tej pozycji.</p>';
+  renderBookList();
+}
+function movesSoFar() {
+  const base = S.explore ? S.explore.base : S.ply;
+  const arr = S.game.moves.slice(0, base).map((m) => m.san);
+  if (S.explore) arr.push(...S.explore.moves.slice(0, S.explore.idx).map((m) => m.san));
+  return arr;
+}
+$('book-moves').onclick = (e) => { const b = e.target.closest('[data-uci]'); if (b) playUci(b.dataset.uci); };
+function renderBookList() {
+  if (!BOOK) return;
+  const q = $('book-q').value.trim().toLowerCase();
+  const fam = new Map();
+  for (const [eco, name, pgn] of BOOK.list) {
+    if (q && !(name.toLowerCase().includes(q) || eco.toLowerCase().startsWith(q))) continue;
+    const f = name.split(':')[0];
+    if (!fam.has(f)) fam.set(f, []);
+    fam.get(f).push([eco, name, pgn]);
+  }
+  const fams = [...fam.entries()].slice(0, q ? 60 : 400);
+  $('book-list').innerHTML = fams.map(([f, items]) => `<details ${q ? 'open' : ''}><summary><b>${esc(f)}</b> <span class="muted">${items[0][0]} · ${items.length}</span></summary>
+    ${items.slice(0, 80).map((it) => `<div class="book-item" data-pgn="${esc(it[2])}"><span class="pill">${esc(it[0])}</span> ${esc(it[1].split(': ')[1] || it[1])}<small class="mono">${esc(it[2])}</small></div>`).join('')}</details>`).join('');
+}
+let bookQT = null;
+$('book-q').oninput = () => { clearTimeout(bookQT); bookQT = setTimeout(renderBookList, 200); };
+$('book-list').onclick = (e) => {
+  const it = e.target.closest('[data-pgn]');
+  if (!it) return;
+  setGame(buildGame(it.dataset.pgn));
+  S.ply = S.game.moves.length;
+  render();
+};
+
 // ---------- start ----------
 async function init() {
   const [pieces, openings, engines] = await Promise.all([
@@ -1363,10 +1607,19 @@ async function init() {
   setExplorerSrc(S.explorerSrc);
   refreshDbList().catch(() => {});
   initTraining({
-    S, render, sound, toast, badgeHtml, store, fetchUserPgns, terminalEval,
+    S, render, sound, toast, badgeHtml, store, fetchUserPgns, terminalEval, catSays,
     openings: () => S.openings,
     engineId: () => $('review-engine').value,
     loadPgnText: (t) => { S.train = null; loadPgnText(t, { review: false }); },
+  });
+  initProfile({ store, toast, sound, showTab });
+  initPlay({
+    S, render, sound, toast, store, catSays, profile, saveProfile, lichessToken, lichessUser,
+    reviewPgn: (pgn) => { loadPgnText(pgn, { review: true }); showTab('report'); },
+  });
+  initStudy({
+    S, render, sound, toast, store, apiFetch, drills,
+    loadPgnText: (t) => { S.train = null; loadPgnText(t, { review: false }); showTab('analysis'); },
   });
   renderReportSummary();
   render();

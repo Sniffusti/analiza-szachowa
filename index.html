@@ -52,6 +52,7 @@
         <button class="icon-btn" id="btn-download" title="Pobierz PGN">⤓</button>
         <button class="icon-btn" id="btn-copy-pgn" title="Kopiuj PGN">PGN</button>
         <button class="icon-btn" id="btn-copy-fen" title="Kopiuj FEN">FEN</button>
+        <button class="icon-btn" id="btn-save" title="Zapisz analizę">♥</button>
         <a class="icon-btn" id="btn-lichess" target="_blank" rel="noopener" title="Otwórz pozycję na lichess">↗</a>
       </div>
     </section>
@@ -59,12 +60,15 @@
     <section class="panel">
       <header class="panel-head">
         <div class="brand"><img class="logo" src="logo.png" alt="">ANALIZA.<small>SZACHY · PRZEGLĄD PARTII</small></div>
+        <button class="profile-badge" id="profile-badge" title="Twój profil"></button>
       </header>
       <div class="strip"><span class="dot"></span><span id="strip-engine">Silnik: –</span><span class="sep">|</span><span id="strip-mode">Tryb: analiza</span><span id="strip-game"></span></div>
       <nav class="tabs">
         <button data-tab="report" class="active"><span>▦</span>Raport</button>
         <button data-tab="analysis"><span>⌕</span>Analiza</button>
         <button data-tab="openings"><span>❖</span>Otwarcia</button>
+        <button data-tab="play"><span>♟</span>Graj</button>
+        <button data-tab="study"><span>❏</span>Opracowania</button>
         <button data-tab="train"><span>♞</span>Trening</button>
         <button data-tab="import"><span>⇩</span>Import</button>
         <button data-tab="settings"><span>⚙</span>Ustawienia</button>
@@ -94,18 +98,72 @@
 
         <!-- ANALIZA -->
         <div class="tab" id="tab-analysis" hidden>
-          <div class="eyebrow">Silnik na żywo</div>
-          <div class="sec-title">Analiza <span>/ sprawdź każdy ruch</span></div>
-          <div class="live-head">
-            <label class="switch"><input type="checkbox" id="live-on" checked><span></span> Silnik</label>
-            <select id="live-engine"></select>
-            <label>Linie <select id="live-multipv"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></label>
+          <div class="seg" id="an-sub">
+            <button data-sub="engine" class="active">⌕ Analiza</button>
+            <button data-sub="menu">☰ Menu</button>
+            <button data-sub="book">◎ Przeglądaj</button>
           </div>
-          <div class="coach" id="coach-analysis" hidden></div>
-          <div class="live-status" id="live-status"></div>
-          <div class="lines" id="lines"></div>
-          <p class="hint">Przesuń dowolną bierkę na szachownicy, żeby sprawdzić inny ruch. Kliknij ruch w linii silnika, żeby go zagrać. „Wróć do partii” przywraca główną linię.</p>
-          <div class="moves" id="moves-analysis"></div>
+
+          <div class="an-pane" id="an-engine">
+            <div class="engine-box">
+              <div class="engine-head">
+                <label class="toggle"><input type="checkbox" id="live-on" checked><span class="knob"></span><b>Analiza</b></label>
+                <span class="engine-meta" id="live-status"></span>
+                <select id="live-engine" title="Silnik"></select>
+                <select id="live-multipv" title="Liczba linii"><option value="1">1 linia</option><option value="2">2 linie</option><option value="3" selected>3 linie</option><option value="4">4 linie</option><option value="5">5 linii</option></select>
+              </div>
+              <div class="lines" id="lines"></div>
+              <div class="engine-foot" id="engine-opening">◎ –</div>
+            </div>
+            <div class="coach" id="coach-analysis" hidden></div>
+            <div class="moves" id="moves-analysis"></div>
+            <p class="hint">Przesuń bierkę, żeby sprawdzić inny ruch. Kliknij ruch w linii silnika, żeby go zagrać.</p>
+          </div>
+
+          <div class="an-pane" id="an-menu" hidden>
+            <div class="paste-row"><input id="an-paste" placeholder="Wklej PGN, FEN albo link do opracowania / partii lichess…"><button class="btn" id="an-paste-go" title="Wczytaj">＋</button></div>
+            <button class="btn wide" id="an-load">Wczytaj</button>
+            <div class="menu-list">
+              <button class="menu-item" data-m="editor"><span class="mi-ico" style="--c:#7fbf5a">✎</span><span><b>Ustaw pozycję</b><small>Zacznij analizę z dowolnej pozycji</small></span></button>
+              <button class="menu-item" data-m="new"><span class="mi-ico" style="--c:#6aa8ff">＋</span><span><b>Nowa analiza</b><small>Zacznij od pustej szachownicy</small></span></button>
+              <button class="menu-item" data-m="collections"><span class="mi-ico" style="--c:#b9a2ff">▦</span><span><b>Kolekcje partii</b><small>Twoje bazy PGN i partie z chess.com / lichess</small></span></button>
+              <button class="menu-item" data-m="search"><span class="mi-ico" style="--c:#e7b84a">⌕</span><span><b>Wyszukiwanie partii</b><small>Szukaj po graczu lub otwarciu w swoich bazach</small></span></button>
+              <button class="menu-item" data-m="book"><span class="mi-ico" style="--c:#f06a5c">◎</span><span><b>Przeglądaj</b><small>Książeczka debiutów i ruchy książkowe</small></span></button>
+              <button class="menu-item" data-m="saved"><span class="mi-ico" style="--c:#d5a47d">♥</span><span><b>Zapisane analizy</b><small>Wróć do zapisanych analiz</small></span></button>
+              <button class="menu-item" data-m="play"><span class="mi-ico" style="--c:#26c2a3">♟</span><span><b>Graj</b><small>Partia z silnikiem albo na lichess</small></span></button>
+            </div>
+            <button class="link-btn" id="an-prev">⟲ Załaduj poprzednią</button>
+            <div id="an-search" hidden>
+              <h3>Wyszukiwanie partii</h3>
+              <div class="row"><input id="an-search-q" placeholder="gracz, otwarcie, ECO, wydarzenie…"><button class="btn primary" id="an-search-go">Szukaj</button></div>
+              <div class="muted" id="an-search-status"></div>
+              <div class="game-list" id="an-search-list"></div>
+            </div>
+            <div id="an-saved" hidden><h3>Zapisane analizy</h3><div id="an-saved-list"></div></div>
+          </div>
+
+          <div class="an-pane" id="an-editor" hidden>
+            <div class="eyebrow">Ustaw pozycję</div>
+            <div class="palette" id="ed-palette"></div>
+            <div class="row">
+              <select id="ed-turn"><option value="w">Ruch białych</option><option value="b">Ruch czarnych</option></select>
+              <button class="btn" data-ed="start">Pozycja startowa</button>
+              <button class="btn" data-ed="clear">Wyczyść</button>
+              <button class="btn" data-ed="flip">Obróć</button>
+            </div>
+            <div class="row"><input id="ed-fen" class="mono" spellcheck="false"></div>
+            <div class="row"><button class="btn primary" data-ed="done">Analizuj tę pozycję</button><button class="btn" data-ed="cancel">Anuluj</button></div>
+            <p class="muted">Wybierz bierkę z palety i klikaj pola, żeby ją stawiać. Gumka usuwa. Bierki na planszy możesz też przeciągać, a przeciągnięcie poza planszę je usuwa.</p>
+          </div>
+
+          <div class="an-pane" id="an-book" hidden>
+            <div class="book-cur" id="book-cur"></div>
+            <h3>Ruchy książkowe w tej pozycji</h3>
+            <div class="book-moves" id="book-moves"></div>
+            <h3>Wszystkie otwarcia</h3>
+            <div class="row"><input id="book-q" placeholder="Szukaj: Sicilian, Vienna, C25…"></div>
+            <div class="book-list" id="book-list"></div>
+          </div>
         </div>
 
         <!-- OTWARCIA -->
@@ -151,14 +209,118 @@
           <div class="explorer" id="explorer"></div>
         </div>
 
+        <!-- GRAJ -->
+        <div class="tab" id="tab-play" hidden>
+          <div class="eyebrow">Nowa partia</div>
+          <div class="sec-title">Graj <span>/ z silnikiem albo na lichess</span></div>
+          <div id="play-setup">
+            <div class="seg" id="play-sub"><button data-sub="engine" class="active">Z silnikiem</button><button data-sub="lichess">Lichess</button></div>
+            <div id="play-engine-pane">
+              <div class="card">
+                <div class="eyebrow" style="margin-top:0">Siła przeciwnika</div>
+                <div class="elo-row"><input type="range" id="play-elo" min="400" max="3000" step="50"><b class="mono" id="play-elo-l"></b></div>
+                <div class="row">
+                  <select id="play-color"><option value="w">Gram białymi</option><option value="b">Gram czarnymi</option><option value="r" selected>Losowo</option></select>
+                  <select id="play-tc"><option value="0">Bez zegara</option><option value="3+2">3 + 2</option><option value="5+0">5 min</option><option value="10+0" selected>10 min</option><option value="15+10">15 + 10</option><option value="30+0">30 min</option></select>
+                  <select id="play-engine" title="Silnik"></select>
+                </div>
+                <button class="btn primary big" id="play-start">Graj</button>
+              </div>
+            </div>
+            <div id="play-lichess-pane" hidden>
+              <div class="card">
+                <div class="row">
+                  <select id="li-tc"><option value="10+0">10 min</option><option value="10+5" selected>10 + 5</option><option value="15+10">15 + 10</option><option value="30+0">30 min</option><option value="30+20">30 + 20</option></select>
+                  <select id="li-color"><option value="random">Losowy kolor</option><option value="white">Białe</option><option value="black">Czarne</option></select>
+                  <label class="check"><input type="checkbox" id="li-rated"> rankingowa</label>
+                </div>
+                <button class="btn primary big" data-li="seek">Szukaj przeciwnika na lichess</button>
+                <div class="row"><select id="li-ai"><option value="1">Stockfish lichess – poziom 1</option><option value="2">poziom 2</option><option value="3" selected>poziom 3</option><option value="4">poziom 4</option><option value="5">poziom 5</option><option value="6">poziom 6</option><option value="7">poziom 7</option><option value="8">poziom 8</option></select><button class="btn" data-li="ai">Graj z komputerem lichess</button></div>
+                <div class="row"><input id="li-friend" placeholder="nick znajomego na lichess"><button class="btn" data-li="friend">Wyzwij</button></div>
+                <div class="muted" id="li-play-status">Wymaga zalogowania przez lichess (Ustawienia → Konto). Partie lichess przez aplikację: tempo rapid i wolniejsze.</div>
+              </div>
+            </div>
+          </div>
+          <div id="play-game" hidden>
+            <div class="sv-head"><div class="sec-title" id="play-title" style="font-size:17px"></div></div>
+            <div class="clocks" id="play-clocks" hidden></div>
+            <div class="play-result" id="play-result" hidden></div>
+            <div class="row"><button class="btn" id="play-takeback">↶ Cofnij</button><button class="btn" id="play-resign">⚑ Poddaj się</button></div>
+            <div class="moves" id="play-moves"></div>
+          </div>
+        </div>
+
+        <!-- OPRACOWANIA -->
+        <div class="tab" id="tab-study" hidden>
+          <div class="eyebrow">Wiedza debiutowa</div>
+          <div class="sec-title">Opracowania <span>/ warianty, komentarze, drille</span></div>
+          <div class="seg" id="study-sub">
+            <button data-sub="studies" class="active">Opracowania</button>
+            <button data-sub="drills">Drille</button>
+          </div>
+          <div class="study-pane" id="study-studies">
+            <div id="study-home">
+              <div id="study-list"></div>
+              <h3>Import z lichess</h3>
+              <div class="row"><input id="study-url" placeholder="https://lichess.org/study/…  (całe opracowanie albo rozdział)"><button class="btn primary" id="study-import">Importuj</button></div>
+              <h3>Z pliku albo od zera</h3>
+              <div class="row">
+                <label class="btn file">Wczytaj PGN<input type="file" id="study-file" accept=".pgn,.txt" multiple hidden></label>
+                <input id="study-newname" placeholder="Nazwa nowego opracowania">
+                <button class="btn" id="study-new">Nowe z bieżącej partii</button>
+              </div>
+              <div class="muted" id="study-status"></div>
+              <p class="muted">Każda partia w pliku PGN to osobny rozdział. Warianty, komentarze i strzałki ([%cal], [%csl]) z lichess są zachowane.</p>
+            </div>
+            <div id="study-view" hidden>
+              <div class="sv-head">
+                <div class="sec-title" id="sv-title"></div>
+                <select id="sv-chapters"></select>
+              </div>
+              <div id="sv-cat"></div>
+              <div class="row sv-nav" id="sv-nav">
+                <button class="btn" data-n="first" title="Początek">⏮</button>
+                <button class="btn" data-n="prev" title="Wstecz (←)">◀</button>
+                <button class="btn" data-n="next" title="Dalej (→)">▶</button>
+                <button class="btn" data-n="last" title="Koniec">⏭</button>
+                <button class="btn primary" data-n="comment">✎ Komentarz</button>
+                <button class="btn" data-n="promote" title="Ustaw jako główną linię">⇧ Główna</button>
+                <button class="btn" data-n="delete" title="Usuń ruch i dalsze">✕ Usuń</button>
+                <button class="btn" data-n="analyse" title="Otwórz w analizie z silnikiem">⌕ Analiza</button>
+                <button class="btn" data-n="close" title="Zamknij opracowanie">Zamknij</button>
+              </div>
+              <div class="sv-tree" id="sv-tree"></div>
+            </div>
+          </div>
+          <div class="study-pane" id="study-drills" hidden>
+            <div id="rep-list"></div>
+            <div class="drill-box" id="drill-box" hidden>
+              <div class="pz-status" id="drill-status"></div>
+              <div class="row"><button class="btn" id="drill-hint">Podpowiedź</button><button class="btn" id="drill-restart">Nowa linia</button><button class="btn" id="drill-stop">Zakończ</button></div>
+            </div>
+            <h3>Nowy drill</h3>
+            <div class="row">
+              <input id="rep-name" placeholder="Nazwa, np. Gambit wiedeński">
+              <select id="rep-color"><option value="w">Gram białymi</option><option value="b">Gram czarnymi</option></select>
+            </div>
+            <div class="row"><label class="btn file">Pliki PGN z wariantami<input type="file" id="rep-file" accept=".pgn,.txt" multiple hidden></label>
+              <label class="check"><input type="checkbox" id="rep-from-game"> bieżąca partia / wariant</label></div>
+            <textarea id="rep-pgn" rows="3" placeholder="…albo wklej PGN z wariantami, np. 1. e4 e5 2. Nc3 Nf6 (2... Nc6 3. Bc4) 3. f4"></textarea>
+            <div class="row"><button class="btn primary" id="rep-create">Utwórz drill</button></div>
+            <div class="muted" id="rep-file-status"></div>
+            <p class="muted">Jak w ChessBase: program gra ruchy przeciwnika z repertuaru, a Ty musisz odpowiadać swoimi. Częściej wracają pozycje, w których się mylisz. Z ChessBase: zaznacz partie/rozdziały → Plik → Eksport → PGN (warianty zostają).</p>
+          </div>
+
+        </div>
+
         <!-- TRENING -->
         <div class="tab" id="tab-train" hidden>
           <div class="eyebrow">Ćwiczenia</div>
           <div class="sec-title">Trening <span>/ zadania, drille, trener</span></div>
           <div class="seg" id="train-sub">
             <button data-sub="puzzles" class="active">Zadania</button>
+            <button data-sub="rush">Puzzle Rush</button>
             <button data-sub="mistakes">Moje błędy</button>
-            <button data-sub="drills">Drille</button>
             <button data-sub="tutor">Trener</button>
           </div>
 
@@ -176,29 +338,26 @@
             <p class="muted">Zadania pochodzą z bazy lichess (lichess.org/training) – wymagają internetu.</p>
           </div>
 
+          <div class="train-pane" id="train-rush" hidden>
+            <div class="rush-head">
+              <div class="rush-stat"><small>Wynik</small><b class="mono" id="rush-score">0</b></div>
+              <div class="rush-stat"><small>Czas</small><b class="mono" id="rush-time">–</b></div>
+              <div class="rush-stat"><small>Błędy</small><b id="rush-strikes">○○○</b></div>
+            </div>
+            <div class="row" id="rush-start-row">
+              <button class="btn primary" data-rush="3">3 minuty</button>
+              <button class="btn primary" data-rush="5">5 minut</button>
+              <button class="btn" data-rush="survival">Przetrwanie (3 błędy)</button>
+            </div>
+            <div class="muted" id="rush-best"></div>
+            <div class="pz-box" id="rush-box"></div>
+          </div>
+
           <div class="train-pane" id="train-mistakes" hidden>
             <div class="muted" id="mk-info"></div>
             <div class="row"><button class="btn primary" id="mk-start">Następny błąd</button><button class="btn" id="mk-clear">Wyczyść listę</button></div>
             <div class="pz-box" id="mk-box"></div>
             <p class="muted">Każdy błąd wraca jak fiszka: rozwiązany – za 1, 3, 7, 14… dni; nierozwiązany – za 10 minut.</p>
-          </div>
-
-          <div class="train-pane" id="train-drills" hidden>
-            <div id="rep-list"></div>
-            <div class="drill-box" id="drill-box" hidden>
-              <div class="pz-status" id="drill-status"></div>
-              <div class="row"><button class="btn" id="drill-hint">Podpowiedź</button><button class="btn" id="drill-restart">Nowa linia</button><button class="btn" id="drill-stop">Zakończ</button></div>
-            </div>
-            <h3>Nowy drill</h3>
-            <div class="row">
-              <input id="rep-name" placeholder="Nazwa, np. Gambit wiedeński">
-              <select id="rep-color"><option value="w">Gram białymi</option><option value="b">Gram czarnymi</option></select>
-            </div>
-            <div class="row"><label class="btn file">Pliki PGN z wariantami<input type="file" id="rep-file" accept=".pgn,.txt" multiple hidden></label>
-              <label class="check"><input type="checkbox" id="rep-from-game"> bieżąca partia / wariant</label></div>
-            <textarea id="rep-pgn" rows="3" placeholder="…albo wklej PGN z wariantami, np. 1. e4 e5 2. Nc3 Nf6 (2... Nc6 3. Bc4) 3. f4"></textarea>
-            <div class="row"><button class="btn primary" id="rep-create">Utwórz drill</button></div>
-            <p class="muted">Jak w ChessBase: program gra ruchy przeciwnika z repertuaru, a Ty musisz odpowiadać swoimi. Częściej wracają pozycje, w których się mylisz. Z ChessBase: zaznacz partie/rozdziały → Plik → Eksport → PGN (warianty zostają).</p>
           </div>
 
           <div class="train-pane" id="train-tutor" hidden>
@@ -248,6 +407,20 @@
         <div class="tab" id="tab-settings" hidden>
           <div class="eyebrow">Wygląd i konto</div>
           <div class="sec-title">Ustawienia <span>/ bierki, plansze, dźwięki</span></div>
+          <h3>Konto</h3>
+          <div class="card profile-card">
+            <div class="pf-top">
+              <label class="pf-ava" title="Zmień zdjęcie profilowe"><span id="pf-ava"></span><input type="file" id="pf-ava-file" accept="image/*" hidden><small>Zmień</small></label>
+              <div class="pf-fields">
+                <input id="pf-name" placeholder="Twoja nazwa">
+                <div class="row"><input id="pf-cc" placeholder="nick na chess.com"><input id="pf-li" placeholder="nick na lichess"></div>
+              </div>
+            </div>
+            <div class="pz-stats" id="pf-stats"></div>
+            <div class="row"><button class="btn primary" id="pf-save">Zapisz profil</button><button class="btn" id="pf-del-ava">Usuń zdjęcie</button></div>
+            <div class="row" id="pf-lichess"></div>
+            <p class="muted">Profil jest zapisany na tym urządzeniu. Logowanie przez lichess otwiera stronę lichess – tam podajesz hasło, aplikacja go nie widzi.</p>
+          </div>
           <h3>Zestaw bierek</h3>
           <div class="grid pieces" id="piece-grid"></div>
           <h3>Szachownica</h3>

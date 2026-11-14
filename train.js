@@ -48,16 +48,18 @@ function playOn(fen, uci) {
 let current = null; // aktywne ćwiczenie {kind, resume()}
 
 export function onShowTab(name) {
-  if (name === 'train') current?.resume?.();
-  else if (A.S.train) { A.S.train = null; A.render(); }
+  if (name === 'train' && current?.kind === 'puzzle') current.resume();
 }
+export const drills = {
+  show() { renderRepList(); if (current?.kind === 'drill' && !$('drill-box').hidden) current.resume(); },
+};
 
 function setSub(sub) {
   for (const b of $('train-sub').children) b.classList.toggle('active', b.dataset.sub === sub);
   for (const p of document.querySelectorAll('.train-pane')) p.hidden = p.id !== 'train-' + sub;
   A.store.set('trainSub', sub);
   if (sub === 'mistakes') refreshMistakesInfo();
-  if (sub === 'drills') renderRepList();
+  if (sub === 'rush') rushUi();
   if (sub === 'tutor') renderTutorReport();
 }
 
@@ -96,6 +98,7 @@ function runPuzzle(p, boxId) {
   });
   async function finish(ok) {
     st.done = true;
+    if (p.rush) { status(ok ? '✓ Dobrze!' : '✕ Błąd', ok ? 'ok' : 'bad'); p.onDone?.(ok); view(); if (p.next) setTimeout(p.next, ok ? 450 : 1100); return; }
     if (ok && !st.failed) { status('✓ Rozwiązane!', 'ok'); A.sound.play('Confirmation'); }
     else if (ok) status('✓ Rozwiązane (z błędem po drodze).', 'ok');
     else status('Rozwiązanie pokazane.', 'bad');
@@ -139,6 +142,7 @@ function runPuzzle(p, boxId) {
     // błąd
     st.failed = true;
     A.sound.play('Error');
+    if (p.rush) { st.fen = fenAfter; st.lastMove = [m.from, m.to]; return finish(false); }
     const prevFen = st.fen, prevLast = st.lastMove;
     st.fen = fenAfter; st.lastMove = [m.from, m.to]; view();
     status(`✕ ${esc(m.san)} to nie to. Spróbuj jeszcze.`, 'bad');
@@ -170,6 +174,7 @@ function runPuzzle(p, boxId) {
     } else if (a === 'next') p.next?.();
   };
   current = { kind: 'puzzle', st, resume: view };
+  if (p.rush) box.querySelector('.pz-actions').hidden = true;
   fx.enter(box.children, { step: 40 });
   view();
 }
@@ -210,6 +215,69 @@ async function nextLichessPuzzle() {
 function renderPzStats() {
   const s = pzStats();
   $('pz-stats').innerHTML = `<span class="pill accent">Ranking ${s.rating}</span><span class="pill">Rozwiązane ${s.solved}</span><span class="pill">Nieudane ${s.failed}</span><span class="pill">Seria ${s.streak}</span>`;
+}
+
+// ---------------------------------------------------------------- Puzzle Rush
+const RU = { on: false };
+function rushDiff() { const s = RU.score; return s < 4 ? 'easiest' : s < 9 ? 'easier' : s < 15 ? 'normal' : s < 23 ? 'harder' : 'hardest'; }
+async function fetchPuzzle(diff) {
+  const r = await fetch(`https://lichess.org/api/puzzle/next?angle=mix&difficulty=${diff}`, { headers: { Accept: 'application/json' } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+function rushUi() {
+  $('rush-score').textContent = RU.score ?? 0;
+  $('rush-strikes').innerHTML = [0, 1, 2].map((i) => `<span class="${i < (RU.strikes || 0) ? 'x' : ''}">${i < (RU.strikes || 0) ? '✕' : '○'}</span>`).join('');
+  const best = A.store.get('rushBest', {});
+  $('rush-best').textContent = `Rekordy: 3 min – ${best['3'] || 0} · 5 min – ${best['5'] || 0} · przetrwanie – ${best.survival || 0}`;
+}
+async function startRush(mode) {
+  clearInterval(RU.timer);
+  Object.assign(RU, { on: true, mode, score: 0, strikes: 0, end: mode === 'survival' ? null : Date.now() + (+mode) * 60000, next: null });
+  $('rush-start-row').hidden = true;
+  rushUi();
+  RU.timer = setInterval(() => {
+    if (!RU.end) { $('rush-time').textContent = '∞'; return; }
+    const left = Math.max(0, RU.end - Date.now());
+    $('rush-time').textContent = `${Math.floor(left / 60000)}:${String(Math.floor(left / 1000) % 60).padStart(2, '0')}`;
+    if (!left) endRush('Koniec czasu!');
+  }, 250);
+  RU.next = fetchPuzzle(rushDiff());
+  nextRush();
+}
+async function nextRush() {
+  if (!RU.on) return;
+  let data;
+  try { data = await RU.next; } catch (e) { $('rush-box').innerHTML = `<p class="muted">Nie udało się pobrać zadania (${esc(e.message)}).</p>`; return endRush('Błąd połączenia'); }
+  if (!RU.on) return;
+  RU.next = fetchPuzzle(rushDiff()).catch((e) => { throw e; });
+  const c = new Chess();
+  let last = null;
+  for (const san of data.game.pgn.split(' ')) { try { last = c.move(san); } catch { break; } }
+  runPuzzle({
+    fen: c.fen(), sol: data.puzzle.solution, lastMove: last ? [last.from, last.to] : null, rush: true,
+    title: `Zadanie ${RU.score + RU.strikes + 1} · ranking ${data.puzzle.rating}`,
+    onDone(ok) {
+      if (ok) RU.score++; else RU.strikes++;
+      rushUi();
+      if (RU.strikes >= 3) endRush('Trzy błędy!');
+    },
+    next: () => RU.on && nextRush(),
+  }, 'rush-box');
+}
+function endRush(why) {
+  if (!RU.on) return;
+  RU.on = false;
+  clearInterval(RU.timer);
+  const best = A.store.get('rushBest', {});
+  const rec = RU.score > (best[RU.mode] || 0);
+  if (rec) { best[RU.mode] = RU.score; A.store.set('rushBest', best); }
+  A.sound.play(rec ? 'Confirmation' : 'GenericNotify');
+  $('rush-box').innerHTML = `<div class="result-card"><div class="rc-title">${esc(why)}</div><div class="rc-rating"><b class="mono">${RU.score}</b><small>rozwiązanych zadań${rec ? ' – nowy rekord! 🏆' : ''}</small></div>
+    ${A.catSays ? A.catSays(rec ? 'Nowy rekord! Tak trzymaj!' : 'Dobra robota! Spróbujesz pobić rekord?') : ''}</div>`;
+  $('rush-start-row').hidden = false;
+  current = null; A.S.train = null; A.render();
+  rushUi();
 }
 
 // ---------------------------------------------------------------- zadania z własnych błędów
@@ -436,7 +504,7 @@ function drillLineDone() {
   drillView();
   renderRepList();
   const id = DR.rep.id;
-  setTimeout(() => { if (current?.kind === 'drill' && DR.rep?.id === id && !$('tab-train').hidden) startDrill(id); }, 1600);
+  setTimeout(() => { if (current?.kind === 'drill' && DR.rep?.id === id && !$('tab-study').hidden && !$('study-drills').hidden) startDrill(id); }, 1600);
 }
 
 // ---------------------------------------------------------------- trener (jak Lichess Tutor)
@@ -684,12 +752,25 @@ export function initTraining(api) {
   $('pz-diff').value = A.store.get('pzDiff', 'normal');
   $('train-sub').onclick = (e) => { const s = e.target.dataset.sub; if (s) setSub(s); };
   $('pz-start').onclick = nextLichessPuzzle;
+  for (const b of document.querySelectorAll('[data-rush]')) b.onclick = () => startRush(b.dataset.rush);
   $('mk-start').onclick = nextMistake;
   $('mk-clear').onclick = async () => {
     if (!confirm('Usunąć wszystkie zadania z Twoich błędów?')) return;
     await saveMistakes([]); $('mk-box').innerHTML = ''; refreshMistakesInfo();
   };
   $('rep-create').onclick = createRep;
+  // wybór pliku od razu tworzy drill (nazwa z pliku, jeśli pusta)
+  $('rep-file').onchange = async () => {
+    const files = [...$('rep-file').files];
+    if (!files.length) return;
+    if (!$('rep-name').value.trim()) {
+      const h = parseHeaders(await files[0].text());
+      $('rep-name').value = h.StudyName || (h.Event && h.Event !== '?' ? h.Event.split(': ')[0] : '') || files[0].name.replace(/\.(pgn|txt)$/i, '');
+    }
+    $('rep-file-status').textContent = `Wczytuję: ${files.map((f) => f.name).join(', ')}…`;
+    await createRep();
+    $('rep-file-status').textContent = '';
+  };
   $('rep-list').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-r]');
     const id = e.target.closest('[data-id]')?.dataset.id;
@@ -729,5 +810,5 @@ export function initTraining(api) {
     if (e.target.closest('[data-go="mistakes"]')) { setSub('mistakes'); nextMistake(); }
   });
   renderPzStats();
-  setSub(A.store.get('trainSub', 'puzzles'));
+  setSub((['puzzles', 'rush', 'mistakes', 'tutor'].includes(A.store.get('trainSub', 'puzzles')) ? A.store.get('trainSub', 'puzzles') : 'puzzles'));
 }

@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Analiza partii</title>
+  <title>Shakkusti</title>
   <link rel="icon" type="image/png" href="favicon.png?v=3">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-180.png?v=3">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Analiza">
+  <meta name="apple-mobile-web-app-title" content="Shakkusti">
   <meta name="theme-color" content="#1e1e21">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,7 +24,7 @@
 <body>
   <div class="shell">
   <aside class="sidebar">
-    <div class="sb-brand"><img src="logo.png" alt=""><span>Analiza<b>.</b></span></div>
+    <div class="sb-brand"><img src="logo.png" alt=""><span>Shakkusti<b>.</b></span></div>
     <nav class="tabs">
       <button data-tab="home"><span class="ni" style="--c:#b9a2ff">⌂</span><em>Start</em></button>
       <button data-tab="play"><span class="ni" style="--c:#f0a35e">♟</span><em>Graj</em></button>
@@ -306,6 +306,13 @@
             <div class="play-result" id="play-result" hidden></div>
             <div class="row"><button class="btn" id="play-takeback">↶ Cofnij</button><button class="btn" id="play-draw">½ Remis</button><button class="btn" id="play-resign">⚑ Poddaj się</button></div>
             <div class="moves" id="play-moves"></div>
+            <div class="chat" id="play-chat" hidden>
+              <div class="chat-log" id="chat-log"></div>
+              <div class="chat-quick" id="chat-quick">
+                <button>Cześć! 👋</button><button>Powodzenia!</button><button>Dobry ruch 👍</button><button>Dzięki za grę!</button><button>Ups 😅</button>
+              </div>
+              <form class="chat-form" id="chat-form"><input id="chat-input" maxlength="200" placeholder="Napisz wiadomość…" autocomplete="off"><button class="btn primary">Wyślij</button></form>
+            </div>
           </div>
         </div>
 
@@ -509,9 +516,12 @@
             </select>
             <input type="range" id="snd-vol" min="0" max="1" step="0.05" style="flex:1">
             <button class="btn" id="snd-test">Test</button>
+            <button class="btn primary" id="snd-unlock">Włącz dźwięk</button>
           </div>
+          <div class="muted" id="snd-status"></div>
+          <p class="muted">Nie słychać? Sprawdź, czy karta przeglądarki nie jest wyciszona (prawy klik na karcie → „Wyłącz wyciszenie witryny”) i czy w Windows nie jest ściszony dźwięk przeglądarki (mikser głośności).</p>
           <h3>Token lichess (opening explorer)</h3>
-          <p class="muted">Od 2025 r. eksplorator otwarć lichess wymaga zalogowania. Utwórz darmowy token bez żadnych uprawnień na <a href="https://lichess.org/account/oauth/token/create?description=Analiza+lokalna" target="_blank" rel="noopener">lichess.org/account/oauth/token</a> i wklej go tutaj. Zapisuje się tylko lokalnie w config.json.</p>
+          <p class="muted">Od 2025 r. eksplorator otwarć lichess wymaga zalogowania. Utwórz darmowy token bez żadnych uprawnień na <a href="https://lichess.org/account/oauth/token/create?description=Shakkusti" target="_blank" rel="noopener">lichess.org/account/oauth/token</a> i wklej go tutaj. Zapisuje się tylko lokalnie w config.json.</p>
           <div class="row">
             <input id="li-token" type="password" placeholder="lip_…">
             <button class="btn" id="btn-token">Zapisz</button>

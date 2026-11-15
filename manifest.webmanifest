@@ -1,6 +1,6 @@
 {
-  "name": "Analiza partii szachowych",
-  "short_name": "Analiza",
+  "name": "Shakkusti – szachy",
+  "short_name": "Shakkusti",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#1e1e21",

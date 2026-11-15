@@ -154,6 +154,35 @@ function renderMoveList() {
   $('play-moves').innerHTML = html;
   ($('play-moves').querySelector('.mv.cur') || $('play-moves').lastElementChild)?.scrollIntoView({ block: 'nearest' });
 }
+// ---------------------------------------------------------------- czat (online P2P i lichess)
+const CHAT = [];
+function addChat(who, text, mine, system) {
+  text = String(text || '').slice(0, 200);
+  if (!text) return;
+  CHAT.push({ who, text, mine, system });
+  const log = $('chat-log');
+  log.insertAdjacentHTML('beforeend', `<div class="cm ${mine ? 'mine' : ''} ${system ? 'sys' : ''}">${system ? '' : `<b>${esc(who)}</b>`}<span>${esc(text)}</span></div>`);
+  log.scrollTop = log.scrollHeight;
+  if (!mine && !system) { A.sound.play('GenericNotify'); fx.pop(log.lastElementChild); }
+}
+async function sendChat(text) {
+  text = text.trim();
+  if (!text || !G.chess) return;
+  if (G.mode === 'online') send({ t: 'chat', text });
+  else if (G.mode === 'lichess') {
+    const r = await liFetch(`/api/board/game/${G.liId}/chat`, { method: 'POST', body: new URLSearchParams({ room: 'player', text }) });
+    if (!r.ok) { A.toast('Lichess nie przyjął wiadomości.'); return; }
+    return; // lichess odeśle wiadomość w strumieniu (chatLine)
+  } else return;
+  addChat(A.profile().name || 'Ty', text, true);
+}
+function resetChat(on) {
+  CHAT.length = 0;
+  $('chat-log').innerHTML = '';
+  $('play-chat').hidden = !on;
+  if (on) addChat('', 'Czat z przeciwnikiem – bądź miły 🙂', false, true);
+}
+
 function beginGame({ mode, color, tc, oppName, oppAva, oppRating, myRating, event, elo }) {
   const [base, inc] = String(tc || '0').split('+').map(Number);
   Object.assign(G, {
@@ -165,6 +194,7 @@ function beginGame({ mode, color, tc, oppName, oppAva, oppRating, myRating, even
   G.headers = { Event: event, White: color === 'w' ? me : oppName, Black: color === 'b' ? me : oppName, WhiteElo: color === 'w' ? myRating : oppRating, BlackElo: color === 'b' ? myRating : oppRating };
   $('play-setup').hidden = true; $('play-game').hidden = false; $('play-result').hidden = true;
   $('play-takeback').hidden = mode !== 'bot' && mode !== 'custom';
+  resetChat(mode === 'online' || mode === 'lichess');
   $('play-title').textContent = event;
   A.sound.play('GenericNotify');
   renderMoveList(); startTimer(); renderClocks(); view();
@@ -354,6 +384,7 @@ function onNet(m, isHost) {
   else if (m.t === 'flag') endGame('win', 'Przeciwnikowi skończył się czas');
   else if (m.t === 'draw?') { if (confirm('Przeciwnik proponuje remis. Przyjąć?')) { send({ t: 'draw!' }); endGame('draw', 'Remis za zgodą'); } }
   else if (m.t === 'draw!') endGame('draw', 'Remis za zgodą');
+  else if (m.t === 'chat') addChat(NET.opp?.name || 'Przeciwnik', m.text, false);
   else if (m.t === 'rematch?') { if (confirm('Przeciwnik chce rewanżu. Grać?')) send(hello()); }
 }
 function startOnline(color, tc) {
@@ -469,6 +500,14 @@ async function runLichessGame(id, ctrl) {
   const r = await liFetch(`/api/board/game/stream/${id}`, { signal: ctrl.signal });
   if (!r.ok) { liStatus('Nie mogę połączyć z partią.'); return; }
   for await (const e of ndjson(r, ctrl.signal)) {
+    if (e.type === 'chatLine') {
+      if (e.room === 'player') {
+        const me = (await A.lichessUser()).toLowerCase();
+        const mine = (e.username || '').toLowerCase() === me;
+        addChat(mine ? (A.profile().name || 'Ty') : e.username, e.text, mine, e.username === 'lichess');
+      }
+      continue;
+    }
     let state = e;
     if (e.type === 'gameFull') {
       const me = (await A.lichessUser()).toLowerCase();
@@ -569,6 +608,8 @@ export function initPlay(api) {
     G.viewPly = v >= n ? null : v;
     renderMoveList(); view();
   };
+  $('chat-form').onsubmit = (e) => { e.preventDefault(); sendChat($('chat-input').value); $('chat-input').value = ''; };
+  $('chat-quick').onclick = (e) => { const b = e.target.closest('button'); if (b) sendChat(b.textContent); };
   $('play-start').onclick = () => { const elo = +$('play-elo').value; startBotGame({ ...botForElo(elo), name: `Stockfish ${elo}`, elo }, { mode: 'custom', color: pickColor($('play-color').value), tc: $('play-tc').value }); };
   $('online-friend').onclick = hostFriend;
   $('online-seek').onclick = matchmake;

@@ -6,6 +6,7 @@ import { splitGames, buildGame, gameFromFen, parseHeaders } from './pgn.js';
 import { idb } from './store.js';
 import * as fx from './fx.js';
 import { materialHtml } from './material.js';
+import { icon } from './icons.js';
 import { initTraining, onShowTab, addMistakesFromReview, drills, openPuzzles, repDue, repCoverFen, startDrill } from './train.js';
 import { initHome, renderHome, miniBoard } from './home.js';
 import { initStudy, onShowStudyTab, catSays, setStudySub } from './study.js';
@@ -79,6 +80,10 @@ const sound = {
     else this.play('Move');
   },
 };
+// ikony Phosphor w menu bocznym i stopce konta
+for (const b of document.querySelectorAll('.sidebar .tabs [data-tab]')) { const ni = b.querySelector('.ni'); if (ni) ni.innerHTML = icon(b.dataset.tab, 20); }
+for (const [go, ic] of [['saved', 'heart'], ['import', 'import'], ['settings', 'gear']]) { const b = document.querySelector(`.sb-icons [data-go="${go}"]`); if (b) b.innerHTML = icon(ic, 20); }
+
 // pierwsza interakcja odblokowuje dźwięk (wymóg przeglądarek, szczególnie Safari na iPhonie)
 for (const ev of ['pointerdown', 'keydown', 'touchstart']) {
   window.addEventListener(ev, () => { sound.ensureCtx(); sound.preload(); }, { once: true, passive: true });
@@ -1346,7 +1351,7 @@ document.addEventListener('keydown', (e) => {
 $('board').addEventListener('wheel', (e) => { e.preventDefault(); go(e.deltaY > 0 ? 1 : -1); }, { passive: false });
 
 // ---------- zakładki ----------
-const PAGE_TITLES = { home: 'Start', play: 'Graj', puzzles: 'Zadania', study: 'Ucz się', train: 'Trener', analysis: 'Analiza', report: 'Przegląd partii', openings: 'Otwarcia', import: 'Import', settings: 'Ustawienia' };
+const PAGE_TITLES = { home: 'Shakkusti', play: 'Graj', puzzles: 'Zadania', study: 'Ucz się', train: 'Trener', analysis: 'Analiza', report: 'Przegląd partii', openings: 'Otwarcia', import: 'Import', settings: 'Ustawienia' };
 function showTab(name) {
   document.querySelector('.app').hidden = name === 'home';
   $('page-title').textContent = PAGE_TITLES[name] || '';
@@ -1405,6 +1410,15 @@ $('btn-token').onclick = async () => {
 
 $('snd-set').onchange = () => { sound.set = $('snd-set').value; store.set('soundSet', sound.set); sound.buffers.clear(); sound.loading.clear(); sound.preload(); sound.play('Move'); };
 $('snd-vol').oninput = () => { sound.vol = +$('snd-vol').value; store.set('soundVol', sound.vol); };
+function soundStatus() {
+  const el = document.getElementById('snd-status');
+  if (!el) return;
+  const st = sound.ctx?.state || 'nieaktywny';
+  el.innerHTML = sound.set === 'off' ? 'Dźwięki są wyłączone (wybierz zestaw powyżej).'
+    : st === 'running' ? '✓ Dźwięk działa.' : `Dźwięk jest wstrzymany przez przeglądarkę (${st}). Kliknij „Włącz dźwięk”.`;
+}
+setInterval(soundStatus, 1500);
+document.getElementById('snd-unlock').onclick = async () => { sound.ensureCtx(); await sound.ctx?.resume?.(); sound.preload(); sound.play('Move'); soundStatus(); };
 $('snd-test').onclick = () => { const seq = ['Move', 'Capture', 'Check', 'Checkmate']; seq.forEach((n, i) => setTimeout(() => sound.play(n), i * 450)); };
 
 // ---------- figurki ----------

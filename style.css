@@ -691,3 +691,35 @@ cg-board square.oc.premove-dest { background: radial-gradient(transparent 0%, tr
 #play-game .mv { cursor: pointer; }
 #moves, #moves-analysis { max-height: 46vh; overflow-y: auto; }
 .sv-tree { max-height: 42vh; }
+
+/* czat w partii */
+.chat { background: var(--panel2); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.chat-log { max-height: 180px; min-height: 70px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
+.chat-log .cm { display: flex; gap: 6px; align-items: baseline; }
+.chat-log .cm b { color: var(--accent-l); flex: 0 0 auto; }
+.chat-log .cm.mine b { color: #7fbf5a; }
+.chat-log .cm.sys span { color: var(--muted); font-style: italic; font-size: 12.5px; }
+.chat-quick { display: flex; flex-wrap: wrap; gap: 5px; }
+.chat-quick button { background: #23221f; border: none; color: var(--text); border-radius: 999px; padding: 4px 10px; font: 600 12px var(--sans); cursor: pointer; }
+.chat-quick button:hover { background: var(--raise); }
+.chat-form { display: flex; gap: 6px; }
+.chat-form input { flex: 1; }
+
+/* ikony Phosphor */
+svg.ph { display: block; }
+.sidebar .tabs button .ni { font-size: 0; }
+.sidebar .tabs button .ni svg.ph { width: 19px; height: 19px; }
+.sidebar .tabs button.active .ni { color: #161513; }
+.sb-icons button { display: grid; place-items: center; }
+.rc-ico svg.ph { width: 24px; height: 24px; }
+.rc-ico { font-size: 0; }
+/* zbite bierki – czytelniej na ciemnym tle */
+.mat { background: #3d3c37; border-radius: 8px; padding: 2px 8px 2px 6px; gap: 0; margin-left: 10px; min-height: 26px; }
+.mat:not(:has(piece)):not(:has(b)) { display: none; }
+.mat piece { width: 22px; height: 22px; margin-left: -9px; }
+.mat piece:first-child, .mat piece.gap { margin-left: 3px; }
+.mat piece.black { filter: drop-shadow(0 0 1px rgba(255, 255, 255, .9)) drop-shadow(0 0 1px rgba(255, 255, 255, .6)); }
+.mat piece.white { filter: drop-shadow(0 0 1px rgba(0, 0, 0, .8)); }
+.mat b { color: #e8e5dc; font-size: 13px; margin-left: 6px; }
+.clock .who .mat piece { width: 21px; height: 21px; }
+.player { min-height: 32px; }

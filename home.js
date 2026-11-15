@@ -3,6 +3,7 @@ import { Chess } from './vendor/chess.js';
 import { idb } from './store.js';
 import * as fx from './fx.js';
 import { ratingCards, bindCharts } from './charts.js';
+import { icon } from './icons.js';
 
 let A;
 export function initHome(api) { A = api; }
@@ -152,14 +153,15 @@ export async function renderHome(api) {
 }
 
 const ICONS = {
-  bullet: ['➶', '#e7a24a', 'Bullet'], blitz: ['⚡', '#f2c94c', 'Blitz'], rapid: ['⏱', '#7fbf5a', 'Szybkie'],
-  daily: ['☀', '#f5b041', 'Dzienne'], puzzle: ['✦', '#ef6b5b', 'Zadania'], career: ['♛', '#b9a2ff', 'Kariera'], bots: ['🐱', '#5aa9f0', 'Boty'],
+  bullet: ['#e7a24a', 'Bullet'], blitz: ['#f2c94c', 'Blitz'], rapid: ['#7fbf5a', 'Szybkie'],
+  daily: ['#f5b041', 'Dzienne'], puzzle: ['#ef6b5b', 'Zadania'], career: ['#b9a2ff', 'Kariera'], bots: ['#5aa9f0', 'Boty'],
 };
 function card(key, rating, history) {
-  const [icon, color, label] = ICONS[key];
+  const [color, label] = ICONS[key];
+  const ic = icon(key, 24);
   const h = (history || []).filter((x) => x.v);
   const delta = h.length >= 2 ? h[h.length - 1].v - h[Math.max(0, h.length - 11)].v : 0;
-  return { icon, color, label, rating, delta, history: h.length ? h : (rating ? [{ t: Date.now(), v: rating }] : []) };
+  return { icon: ic, color, label, rating, delta, history: h.length ? h : (rating ? [{ t: Date.now(), v: rating }] : []) };
 }
 async function renderRatings(src) {
   const box = document.getElementById('rating-cards');

@@ -479,7 +479,7 @@ function renderPlayers() {
   const b = `${esc(h.Black || 'Czarne')} <small>${esc(h.BlackElo || '')}</small>${materialHtml(fen, 'b')}`;
   $('strip-game').textContent = `${h.White || 'Białe'} – ${h.Black || 'Czarne'}${h.Date && !String(h.Date).startsWith('?') ? ' · ' + h.Date : ''}`;
   $('strip-mode').textContent = T ? 'Tryb: trening' : S.explore ? 'Tryb: wariant' : S.review ? 'Tryb: raport' : 'Tryb: analiza';
-  const kIco = (c) => `<img class="pl-king" src="piece/cburnett/${c}K.svg" alt="">`;
+  const kIco = (c) => `<img class="pl-king" src="${pieceUrl(S.settings.pieceSet, c + 'K')}" alt="">`;
   $('player-top').innerHTML = orient === 'white' ? kIco('b') + b : kIco('w') + w;
   $('player-bottom').innerHTML = orient === 'white' ? kIco('w') + w : kIco('b') + b;
 }
@@ -1401,7 +1401,7 @@ function renderSettings() {
 }
 $('piece-grid').onclick = (e) => {
   const b = e.target.closest('[data-set]'); if (!b) return;
-  S.settings.pieceSet = b.dataset.set; store.set('pieceSet', b.dataset.set); applyPieceSet(); renderSettings();
+  S.settings.pieceSet = b.dataset.set; store.set('pieceSet', b.dataset.set); applyPieceSet(); renderSettings(); render();
 };
 $('board-grid').onclick = (e) => {
   const b = e.target.closest('[data-board]'); if (!b) return;

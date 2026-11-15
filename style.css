@@ -728,3 +728,4 @@ svg.ph { display: block; }
 .cg-wrap coords coord { color: #fff; opacity: 1; text-shadow: 0 0 2px #000, 0 0 2px #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .cg-wrap coords.ranks { left: 3px; top: 3px; }
 .cg-wrap coords.files { bottom: 2px; left: 4px; }
+.cg-wrap coords { font-size: clamp(12px, 1.5vw, 18px); text-transform: none; }

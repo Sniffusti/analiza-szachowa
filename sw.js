@@ -1,6 +1,6 @@
 // Service worker Shakkusti: aplikacja działa offline (np. na iPhonie z ekranu początkowego).
 // Pliki aplikacji: najpierw sieć, w razie braku – pamięć podręczna. API zawsze z sieci.
-const CACHE = 'shakkusti-v16';
+const CACHE = 'shakkusti-v17';
 const PRECACHE = [
   './', 'index.html', 'style.css', 'app.js', 'engine.js', 'classify.js', 'pgn.js', 'db-worker.js',
   'manifest.webmanifest', 'icon-180.png', 'favicon.png', 'logo.png', 'icon-192.png', 'icon-512.png',

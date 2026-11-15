@@ -789,7 +789,8 @@ body.zen .board-wrap { width: calc(min(calc(100vh - 110px), calc(100vw - 80px)) 
 .pp-pl div { display: flex; align-items: center; gap: 6px; line-height: 1.6; }
 .pp-pl .sq { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
 .pp-pl .sq.w { background: #f2f1f5; } .pp-pl .sq.b { background: #555; }
-.pp-res { display: flex; align-items: center; gap: 8px; } .pp-res .num { line-height: 1.3; font-weight: 700; }
+.pp-res { vertical-align: middle; text-align: center; }
+.pp-res-in { display: inline-flex; align-items: center; justify-content: center; gap: 8px; } .pp-res .num { line-height: 1.3; font-weight: 700; text-align: center; }
 .pp-acc { line-height: 1.6; }
 .pp-last { display: flex; gap: 16px; align-items: center; margin-bottom: 6px; }
 .pp-last .mini { width: 170px; flex: 0 0 auto; }

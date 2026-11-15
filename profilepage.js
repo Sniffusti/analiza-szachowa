@@ -70,7 +70,7 @@ function gamesTable(list) {
       return `<tr>
         <td class="pp-sp"><span class="ic">${icon(SPEED_ICON[g.speed] || 'rapid', 22)}</span><small>${esc(fmtTc(g.tc))}</small></td>
         <td class="pp-pl"><div><i class="sq w"></i><b>${esc(g.white)}</b> <span class="muted">(${g.wr ?? '?'})</span></div><div><i class="sq b"></i><b>${esc(g.black)}</b> <span class="muted">(${g.br ?? '?'})</span></div>${g.opening ? `<small class="muted">${esc(g.opening)}</small>` : ''}</td>
-        <td class="pp-res"><div class="num">${g.res === 'draw' ? '½<br>½' : (g.res === 'win') === myW ? '1<br>0' : '0<br>1'}</div><span class="rs ${g.res === 'win' ? 'w' : g.res === 'loss' ? 'l' : 'd'}">${sym}</span></td>
+        <td class="pp-res"><div class="pp-res-in"><div class="num">${g.res === 'draw' ? '½<br>½' : (g.res === 'win') === myW ? '1<br>0' : '0<br>1'}</div><span class="rs ${g.res === 'win' ? 'w' : g.res === 'loss' ? 'l' : 'd'}">${sym}</span></div></td>
         <td class="pp-acc num">${g.accW != null ? `<div>${g.accW.toFixed ? g.accW.toFixed(1) : g.accW}</div><div>${g.accB?.toFixed ? g.accB.toFixed(1) : g.accB ?? ''}</div>` : '<button class="btn small" data-rev="' + i + '">Przegląd</button>'}</td>
         <td class="num">${g.moves}</td>
         <td class="num">${g.date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' })}</td>

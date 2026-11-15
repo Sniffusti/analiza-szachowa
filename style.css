@@ -968,3 +968,4 @@ body.board-max .tools .icon-btn:not(#btn-max):not(#btn-flip) { display: none; }
   body.board-max .max-hint { display: block; position: absolute; bottom: calc(env(safe-area-inset-bottom) + 14px); left: 0; right: 0; text-align: center; color: var(--muted); font-size: 12.5px; pointer-events: none; }
 }
 .max-hint { display: none; }
+.pl-king { width: 22px; height: 22px; flex: 0 0 auto; }

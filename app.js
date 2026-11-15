@@ -479,8 +479,9 @@ function renderPlayers() {
   const b = `${esc(h.Black || 'Czarne')} <small>${esc(h.BlackElo || '')}</small>${materialHtml(fen, 'b')}`;
   $('strip-game').textContent = `${h.White || 'Białe'} – ${h.Black || 'Czarne'}${h.Date && !String(h.Date).startsWith('?') ? ' · ' + h.Date : ''}`;
   $('strip-mode').textContent = T ? 'Tryb: trening' : S.explore ? 'Tryb: wariant' : S.review ? 'Tryb: raport' : 'Tryb: analiza';
-  $('player-top').innerHTML = orient === 'white' ? '♚ ' + b : '♔ ' + w;
-  $('player-bottom').innerHTML = orient === 'white' ? '♔ ' + w : '♚ ' + b;
+  const kIco = (c) => `<img class="pl-king" src="piece/cburnett/${c}K.svg" alt="">`;
+  $('player-top').innerHTML = orient === 'white' ? kIco('b') + b : kIco('w') + w;
+  $('player-bottom').innerHTML = orient === 'white' ? kIco('w') + w : kIco('b') + b;
 }
 
 function variationHtml() {

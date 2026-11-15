@@ -794,3 +794,20 @@ body.zen .board-wrap { width: calc(min(calc(100vh - 110px), calc(100vw - 80px)) 
 .pp-last { display: flex; gap: 16px; align-items: center; margin-bottom: 6px; }
 .pp-last .mini { width: 170px; flex: 0 0 auto; }
 .pp-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+
+/* Baza (ChessBase) */
+.base-pane .hcard { margin-bottom: 10px; }
+.op-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px; }
+.op-first { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.sp-pos { display: flex; gap: 14px; align-items: center; margin: 6px 0 10px; background: var(--panel2); border-radius: 14px; padding: 10px; }
+.sp-pos .mini { width: 120px; flex: 0 0 auto; }
+.rp-line { padding: 5px 0; border-top: 1px solid #393834; font-size: 13px; }
+.tu-table tr.mv-row { cursor: pointer; } .tu-table tr.mv-row:hover td { background: var(--raise); }
+/* komentowanie */
+.annot { background: var(--panel2); border-radius: 14px; padding: 10px; margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.annot-nags { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.nagb { min-width: 30px; background: #23221f; border: none; color: var(--text); border-radius: 7px; padding: 4px 6px; font: 800 13px var(--sans); cursor: pointer; }
+.nagb.on { background: var(--accent); color: #fff; }
+.mv .nag { color: var(--accent-l); margin-left: 2px; }
+.mv.cur .nag { color: #fff; }
+.mv .has-com { font-style: normal; font-size: 11px; margin-left: 4px; opacity: .8; }

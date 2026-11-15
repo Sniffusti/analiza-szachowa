@@ -34,6 +34,7 @@
       <button data-tab="analysis"><span class="ni" style="--c:#e7c04a">⌕</span><em>Analiza</em></button>
       <button data-tab="report" class="active"><span class="ni" style="--c:#4fd1b5">▦</span><em>Przegląd</em></button>
       <button data-tab="openings"><span class="ni" style="--c:#d58bf0">❖</span><em>Otwarcia</em></button>
+      <button data-tab="base"><span class="ni" style="--c:#4fb3d9">⛁</span><em>Baza</em></button>
       <button data-tab="import"><span class="ni" style="--c:#9aa3b5">⇩</span><em>Import</em></button>
     </nav>
     <button class="sb-search" id="sb-search" title="Szukaj (Ctrl+K)"><span class="ni" style="--c:#9aa3b5">⌕</span><em>Szukaj</em><kbd>Ctrl K</kbd></button>
@@ -139,6 +140,11 @@
             </div>
             <div class="coach" id="coach-analysis" hidden></div>
             <div class="moves" id="moves-analysis"></div>
+            <div class="annot" id="annot">
+              <div class="annot-nags" id="annot-nags"></div>
+              <textarea id="annot-com" rows="2" placeholder="Komentarz do zaznaczonego ruchu… (zapisuje się w PGN)"></textarea>
+              <div class="row"><button class="btn small" id="annot-arrows" title="Narysuj strzałki prawym przyciskiem myszy, potem zapisz">Zapisz strzałki z planszy</button><button class="btn small" id="annot-clear">Wyczyść komentarze ruchu</button></div>
+            </div>
             <div class="row"><button class="btn" data-save="1">♥ Zapisz analizę</button><button class="btn" data-go2="saved">Zapisane analizy</button><button class="btn primary" id="btn-play-pos">♟ Graj od tej pozycji</button></div>
             <p class="hint">Przesuń bierkę, żeby sprawdzić inny ruch. Kliknij ruch w linii silnika, żeby go zagrać.</p>
           </div>
@@ -230,6 +236,54 @@
             <div class="muted" id="db-status"></div>
           </div>
           <div class="explorer" id="explorer"></div>
+        </div>
+
+        <!-- BAZA (funkcje jak w ChessBase) -->
+        <div class="tab" id="tab-base" hidden>
+          <div class="sec-title">Baza</div>
+          <div class="seg" id="base-sub">
+            <button data-sub="opponent" class="active">Przeciwnik</button>
+            <button data-sub="guess">Zgadnij ruch</button>
+            <button data-sub="search">Szukaj pozycji</button>
+            <button data-sub="report">Raport otwarcia</button>
+          </div>
+          <div class="base-pane" id="base-opponent">
+            <p class="muted">Przygotowanie do partii: pobieram partie przeciwnika i pokazuję, co gra białymi i czarnymi, z jakim wynikiem i gdzie gra najsłabiej.</p>
+            <div class="row">
+              <select id="op-site"><option value="chesscom">Chess.com</option><option value="lichess">Lichess</option></select>
+              <input id="op-user" placeholder="nick przeciwnika">
+              <select id="op-count"><option value="100">100 partii</option><option value="300" selected>300 partii</option><option value="1000">1000 partii</option></select>
+              <button class="btn primary" id="op-run">Przygotuj</button>
+            </div>
+            <div class="muted" id="op-status"></div>
+            <div id="op-report"></div>
+          </div>
+          <div class="base-pane" id="base-guess" hidden>
+            <p class="muted">Odtwarzasz partię i zgadujesz ruchy jednej strony – jak „trening” w ChessBase.</p>
+            <div class="row">
+              <select id="gm-src"><option value="master">Partia arcymistrza (lichess)</option><option value="db">Losowa partia z moich baz</option><option value="current">Partia z analizy</option></select>
+              <select id="gm-color"><option value="w">Zgaduję białe</option><option value="b">Zgaduję czarne</option><option value="auto">Moją stronę</option></select>
+              <label class="muted">Od ruchu <input type="number" id="gm-skip" value="10" min="0" max="80" style="width:64px"></label>
+              <button class="btn primary" id="gm-start">Start</button>
+            </div>
+            <div id="gm-box"></div>
+          </div>
+          <div class="base-pane" id="base-search" hidden>
+            <div class="sp-pos" id="sp-pos"></div>
+            <div class="row">
+              <select id="sp-mode"><option value="exact">Dokładnie ta pozycja</option><option value="pawns">Podobna struktura pionków</option><option value="material">Ten sam materiał</option></select>
+              <button class="btn primary" id="sp-run">Szukaj w moich bazach</button>
+            </div>
+            <p class="muted">Ustaw pozycję w Analizie (ruchami albo edytorem), potem wróć tutaj. Szukam w bazach PGN z „Otwarcia → Baza PGN”.</p>
+            <div class="muted" id="sp-status"></div>
+            <div class="game-list" id="sp-list"></div>
+          </div>
+          <div class="base-pane" id="base-report" hidden>
+            <div class="sp-pos" id="rp-pos"></div>
+            <div class="row"><button class="btn primary" id="rp-run">Utwórz raport dla tej pozycji</button></div>
+            <div class="muted" id="rp-status"></div>
+            <div id="rp-report"></div>
+          </div>
         </div>
 
         <!-- GRAJ -->

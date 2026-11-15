@@ -47,22 +47,55 @@ export function mainlineSans(pgn) {
     .filter((t) => t && !/^(1-0|0-1|1\/2-1\/2|\*|\d+\.+)$/.test(t));
 }
 
+const SUFFIX_NAG = { '!': 1, '?': 2, '!!': 3, '??': 4, '!?': 5, '?!': 6 };
+/** Główna linia z symbolami (NAG) i komentarzami użytkownika (bez wariantów). */
+export function mainlineNotes(pgn) {
+  const body = pgn.replace(/^\s*\[.*\]\s*$/gm, '');
+  const out = [];
+  let intro = '';
+  let depth = 0;
+  const re = /\{([^}]*)\}|;[^\n]*|(\()|(\))|\$(\d+)|([^\s(){};]+)/g;
+  let m;
+  while ((m = re.exec(body))) {
+    if (m[2]) { depth++; continue; }
+    if (m[3]) { depth = Math.max(0, depth - 1); continue; }
+    if (depth) continue;
+    if (m[1] !== undefined) {
+      const t = m[1].trim();
+      if (out.length) out[out.length - 1].comment = ((out[out.length - 1].comment || '') + ' ' + t).trim(); else intro = (intro + ' ' + t).trim();
+      continue;
+    }
+    if (m[4]) { if (out.length) out[out.length - 1].nags.push(+m[4]); continue; }
+    let t = m[5];
+    if (!t) continue;
+    t = t.replace(/^\d+\.(\.\.)?/, '');
+    if (!t || /^(1-0|0-1|1\/2-1\/2|\*|\d+\.+)$/.test(t)) continue;
+    const suf = t.match(/[!?]+$/)?.[0];
+    t = t.replace(/[!?]+$/, '');
+    out.push({ san: t, nags: suf && SUFFIX_NAG[suf] ? [SUFFIX_NAG[suf]] : [], comment: '' });
+  }
+  return { intro, moves: out };
+}
+
 /** Pełna partia do analizy. */
 export function buildGame(pgn) {
   const headers = parseHeaders(pgn);
   const startFen = headers.SetUp === '1' && headers.FEN ? headers.FEN : new Chess().fen();
   const c = new Chess(startFen);
   const moves = [];
-  for (const san of mainlineSans(pgn)) {
+  const notes = mainlineNotes(pgn);
+  for (const n of notes.moves) {
     const fenBefore = c.fen();
     let m;
-    try { m = c.move(san, { strict: false }); } catch { break; }
+    try { m = c.move(n.san, { strict: false }); } catch { break; }
+    // komentarze silnika ([%eval], [%clk]) pomijamy – zostaje tekst i strzałki
+    const comment = (n.comment || '').replace(/\[%(eval|clk|emt)[^\]]*\]/g, '').trim();
     moves.push({
       san: m.san, uci: m.from + m.to + (m.promotion || ''), color: m.color, from: m.from, to: m.to,
-      piece: m.piece, captured: m.captured, fenBefore, fenAfter: c.fen(),
+      piece: m.piece, captured: m.captured, fenBefore, fenAfter: c.fen(), nags: n.nags.filter((k) => k > 0 && k < 140), comment,
     });
   }
-  return { headers, startFen, moves };
+  return { headers, startFen, moves, intro: notes.intro };
 }
 
 export function gameFromFen(fen) {

@@ -2,12 +2,15 @@ import { Chessground } from './vendor/chessground/chessground.js';
 import { Chess } from './vendor/chess.js';
 import { Engine, listEngines, WASM_ID } from './engine.js';
 import * as C from './classify.js';
-import { splitGames, buildGame, gameFromFen, parseHeaders } from './pgn.js';
+import { splitGames, buildGame, gameFromFen, parseHeaders, mainlineSans } from './pgn.js';
+const mainlineSansForDrill = (p) => mainlineSans(p).slice(0, 14).join(' ');
 import { idb } from './store.js';
 import * as fx from './fx.js';
 import { materialHtml } from './material.js';
 import { icon } from './icons.js';
 import { initExtras, onShowExtrasTab } from './extras.js';
+import { initChessbase, onShowBaseTab } from './chessbase.js';
+import { treeFromPgn, countLines } from './pgn-tree.js';
 import { initTraining, onShowTab, addMistakesFromReview, drills, openPuzzles, repDue, repCoverFen, startDrill } from './train.js';
 import { initHome, renderHome, miniBoard, renderRatings } from './home.js';
 import { renderProfilePage } from './profilepage.js';
@@ -263,6 +266,7 @@ function drawShapes() {
   const fen = curFen();
   const cur = currentMoveReview();
   if (S.settings.badges && cur?.r) shapes.push({ orig: cur.mv.to, customSvg: { html: badgeSvg(cur.r.cls) } });
+  shapes.push(...commentShapes(curMainMove()));
   if (S.threat?.fen === fen && S.threat.uci) shapes.push({ orig: S.threat.uci.slice(0, 2), dest: S.threat.uci.slice(2, 4), brush: 'red' });
   if (S.settings.arrow) {
     const ev = getEval(fen);
@@ -438,6 +442,7 @@ function render() {
     updateBoard();
     renderEvalBar();
     renderMoves();
+    renderAnnot();
     renderCoach();
     renderVariationBanner();
     renderPlayers();
@@ -512,7 +517,7 @@ function renderMoves() {
       const m = moves[i];
       const r = S.review?.[i];
       const ev = S.evals[i + 1];
-      cells.push(`<span class="mv${!S.explore && S.ply === i + 1 ? ' cur' : ''}" data-ply="${i + 1}"><span>${r ? badgeHtml(r.cls) : ''} ${esc(m.san)}</span><span class="ev">${ev ? C.formatEval(ev) : ''}</span></span>`);
+      cells.push(`<span class="mv${!S.explore && S.ply === i + 1 ? ' cur' : ''}" data-ply="${i + 1}"><span>${r ? badgeHtml(r.cls) : ''} ${esc(m.san)}${m.nags?.length ? `<b class="nag">${m.nags.map((k) => NAG_SYM[k] || '').join('')}</b>` : ''}${m.comment ? '<i class="has-com" title="' + esc(m.comment.replace(/\[%[^\]]*\]/g, '')) + '">💬</i>' : ''}</span><span class="ev">${ev ? C.formatEval(ev) : ''}</span></span>`);
       i++;
       if (i === exploreRowAfter) pendingVar = true;
     }
@@ -1291,9 +1296,11 @@ function exportPgn() {
     if (m.color === 'w') parts.push(`${no}.`);
     else if (i === 0) parts.push(`${no}...`);
     const r = S.review?.[i];
-    parts.push(m.san + (r && C.CLASSES[r.cls].nag ? ' ' + C.CLASSES[r.cls].nag : ''));
+    const userNags = (m.nags || []).map((k) => '$' + k).join(' ');
+    parts.push(m.san + (userNags ? ' ' + userNags : r && C.CLASSES[r.cls].nag ? ' ' + C.CLASSES[r.cls].nag : ''));
     const ev = S.evals[i + 1];
     const com = [];
+    if (m.comment) com.push(m.comment);
     if (ev) com.push(`[%eval ${ev.mate !== null && ev.mate !== undefined ? '#' + ev.mate : ((ev.cp ?? 0) / 100).toFixed(2)}]`);
     if (r && !['best', 'book', 'excellent', 'good'].includes(r.cls)) com.push(`${C.CLASSES[r.cls].label}. ${r.text}`);
     if (com.length) parts.push(`{ ${com.join(' ').replace(/[{}]/g, '')} }`);
@@ -1356,7 +1363,7 @@ document.addEventListener('keydown', (e) => {
 $('board').addEventListener('wheel', (e) => { e.preventDefault(); go(e.deltaY > 0 ? 1 : -1); }, { passive: false });
 
 // ---------- zakładki ----------
-const PAGE_TITLES = { profile: 'Profil', home: 'Shakkusti', play: 'Graj', puzzles: 'Zadania', study: 'Ucz się', train: 'Trener', analysis: 'Analiza', report: 'Przegląd partii', openings: 'Otwarcia', import: 'Import', settings: 'Ustawienia' };
+const PAGE_TITLES = { base: 'Baza', profile: 'Profil', home: 'Shakkusti', play: 'Graj', puzzles: 'Zadania', study: 'Ucz się', train: 'Trener', analysis: 'Analiza', report: 'Przegląd partii', openings: 'Otwarcia', import: 'Import', settings: 'Ustawienia' };
 function showTab(name) {
   document.querySelector('.app').hidden = name === 'home' || name === 'profile';
   if (name === 'profile') renderProfilePage({ ...HOME_API, lichessToken, renderRatingsInto: (box, src) => renderRatings(src, box) });
@@ -1374,6 +1381,7 @@ function showTab(name) {
   onShowStudyTab(name);
   onShowPlayTab(name);
   onShowExtrasTab(name);
+  onShowBaseTab(name);
   if (name !== 'home') fx.enter(document.querySelectorAll(`#tab-${name} > *`), { step: 30, dist: 6 });
 }
 let HOME_API = null;
@@ -1492,6 +1500,55 @@ function updateEngineExtra() {
   }, 400);
 }
 $('engine-extra').addEventListener('click', (e) => { const b = e.target.closest('[data-uci]'); if (b) playUci(b.dataset.uci); });
+
+// ---------- komentowanie partii (jak ChessBase): symbole, komentarz, strzałki w PGN ----------
+const NAG_SYM = { 1: '!', 2: '?', 3: '!!', 4: '??', 5: '!?', 6: '?!', 10: '=', 13: '∞', 14: '⩲', 15: '⩱', 16: '±', 17: '∓', 18: '+−', 19: '−+', 22: '⨀', 36: '→', 40: '↑' };
+const NAG_MOVE = [1, 2, 3, 4, 5, 6], NAG_POS = [10, 13, 14, 15, 16, 17, 18, 19];
+function curMainMove() { return !S.explore && S.ply > 0 ? S.game.moves[S.ply - 1] : null; }
+function renderAnnot() {
+  const box = $('annot');
+  const m = curMainMove();
+  box.hidden = !m;
+  if (!m) return;
+  const has = new Set(m.nags || []);
+  $('annot-nags').innerHTML = `<span class="muted">${esc(m.san)}:</span>` + [...NAG_MOVE, ...NAG_POS].map((k) => `<button class="nagb ${has.has(k) ? 'on' : ''}" data-nag="${k}" title="$${k}">${NAG_SYM[k]}</button>`).join('');
+  if (document.activeElement !== $('annot-com')) $('annot-com').value = (m.comment || '').replace(/\[%(cal|csl)[^\]]*\]/g, '').trim();
+}
+$('annot-nags').onclick = (e) => {
+  const b = e.target.closest('[data-nag]'); const m = curMainMove(); if (!b || !m) return;
+  const k = +b.dataset.nag;
+  const group = NAG_MOVE.includes(k) ? NAG_MOVE : NAG_POS;
+  const has = (m.nags || []).includes(k);
+  m.nags = (m.nags || []).filter((x) => !group.includes(x));
+  if (!has) m.nags.push(k);
+  renderMoves(); renderAnnot();
+};
+$('annot-com').oninput = () => {
+  const m = curMainMove(); if (!m) return;
+  const shapes = (m.comment || '').match(/\[%(cal|csl)[^\]]*\]/g)?.join(' ') || '';
+  m.comment = ($('annot-com').value.trim() + ' ' + shapes).trim();
+  clearTimeout(renderAnnot.t); renderAnnot.t = setTimeout(renderMoves, 400);
+};
+$('annot-arrows').onclick = () => {
+  const m = curMainMove(); if (!m) return;
+  const shapes = cg.state.drawable.shapes || [];
+  if (!shapes.length) return toast('Najpierw narysuj strzałki prawym przyciskiem myszy na planszy.');
+  const col = { green: 'G', red: 'R', blue: 'B', yellow: 'Y', paleBlue: 'B', paleGreen: 'G', paleRed: 'R' };
+  const arrows = shapes.filter((s) => s.dest).map((s) => (col[s.brush] || 'G') + s.orig + s.dest);
+  const circles = shapes.filter((s) => !s.dest).map((s) => (col[s.brush] || 'G') + s.orig);
+  const text = (m.comment || '').replace(/\[%(cal|csl)[^\]]*\]/g, '').trim();
+  m.comment = [text, arrows.length ? `[%cal ${arrows.join(',')}]` : '', circles.length ? `[%csl ${circles.join(',')}]` : ''].filter(Boolean).join(' ');
+  toast(`Zapisano ${arrows.length} strzałek i ${circles.length} pól przy ruchu ${m.san}.`);
+  renderMoves();
+};
+$('annot-clear').onclick = () => { const m = curMainMove(); if (!m) return; m.nags = []; m.comment = ''; renderMoves(); renderAnnot(); };
+function commentShapes(m) {
+  const out = [];
+  const BR = { G: 'green', R: 'red', B: 'blue', Y: 'yellow' };
+  for (const x of (m?.comment || '').matchAll(/\[%cal ([^\]]+)\]/g)) for (const a of x[1].split(',')) { const t = a.trim(); if (t.length >= 5) out.push({ orig: t.slice(1, 3), dest: t.slice(3, 5), brush: BR[t[0]] || 'green' }); }
+  for (const x of (m?.comment || '').matchAll(/\[%csl ([^\]]+)\]/g)) for (const a of x[1].split(',')) { const t = a.trim(); if (t.length >= 3) out.push({ orig: t.slice(1, 3), brush: BR[t[0]] || 'green' }); }
+  return out;
+}
 
 // ---------- figurki ----------
 const FIG = { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘' };
@@ -1799,6 +1856,30 @@ async function init() {
     loadPgn: (t) => { loadPgnText(t, { review: false }); showTab('analysis'); setAnSub('engine'); },
   });
   $('btn-play-pos').onclick = () => playFromFen(curFen());
+  initChessbase({
+    S, store, toast, sound, render, showTab, apiFetch, fetchUserPgns, catSays, profile, miniBoard,
+    openings: () => S.openings, curFen: () => curFen(), engineId: () => $('review-engine').value,
+    loadGame: (g, ply = 0) => { S.train = null; setGame(g); showTab('analysis'); setAnSub('engine'); goTo(ply); },
+    playSan: (san) => { const c = new Chess(curFen()); try { const m = c.move(san); playUci(m.from + m.to + (m.promotion || '')); } catch {} },
+    openOpponentTree: async (pgns, user) => {
+      toast('Buduję drzewko otwarć przeciwnika…');
+      const res = await buildTree({ pgns, user, maxPlies: 30 });
+      S.trees.mytree = res.trees; S.treeGames.mytree = res.games;
+      showTab('openings'); setExplorerSrc('mytree');
+      $('tree-status').textContent = `Drzewko przeciwnika ${user}: ${pgns.length} partii (zakładki „Jako białe/czarne” = jego kolor).`;
+    },
+    drillFromPgns: async (pgns, user) => {
+      const asWhite = confirm(`Przeciw ${user} grasz białymi? (OK = białe, Anuluj = czarne)`);
+      const myColor = asWhite ? 'w' : 'b';
+      const u = user.toLowerCase();
+      const lines = pgns.filter((p) => { const h = parseHeaders(p); return ((myColor === 'w' ? h.Black : h.White) || '').toLowerCase() === u; })
+        .map((p) => mainlineSansForDrill(p)).filter(Boolean).join(String.fromCharCode(10, 10));
+      const { tree } = treeFromPgn(lines);
+      const rep = { id: Date.now().toString(36), name: `Przeciw ${user}`, color: myColor, tree, stats: {}, lines: countLines(tree), created: Date.now() };
+      await idb.set('rep:' + rep.id, rep);
+      toast(`Utworzono drill „Przeciw ${user}” (${rep.lines} linii) – Ucz się → Drille.`);
+    },
+  });
   initStudy({
     S, render, sound, toast, store, apiFetch, drills,
     loadPgnText: (t) => { S.train = null; loadPgnText(t, { review: false }); showTab('analysis'); },

@@ -194,6 +194,7 @@ function beginGame({ mode, color, tc, oppName, oppAva, oppRating, myRating, even
   G.headers = { Event: event, White: color === 'w' ? me : oppName, Black: color === 'b' ? me : oppName, WhiteElo: color === 'w' ? myRating : oppRating, BlackElo: color === 'b' ? myRating : oppRating };
   $('play-setup').hidden = true; $('play-game').hidden = false; $('play-result').hidden = true;
   $('play-takeback').hidden = mode !== 'bot' && mode !== 'custom';
+  $('play-draw').hidden = false; $('play-resign').hidden = false;
   resetChat(mode === 'online' || mode === 'lichess');
   $('play-title').textContent = event;
   A.sound.play('GenericNotify');
@@ -307,6 +308,7 @@ async function endGame(res, reason) {
   games.unshift({ id: Date.now().toString(36), date: new Date().toISOString().slice(0, 10), mode: G.mode, white: G.headers.White, black: G.headers.Black, result, tc: G.tc, pgn: G.pgn, me: G.color });
   await idb.set('games', games.slice(0, 300));
   A.sound.play(res === 'win' ? 'Confirmation' : res === 'loss' ? 'Error' : 'GenericNotify');
+  for (const id of ['play-takeback', 'play-draw', 'play-resign']) $(id).hidden = true;
   showResult(res, reason, delta, label);
   renderClocks(); view();
 }
@@ -577,6 +579,7 @@ function renderCareer() {
     <div class="career-opp"><img src="${botAva(opp)}" alt=""><div>${A.catSays(`Następny rywal: <b>${esc(opp.name)}</b> grający na Twoim poziomie (${c.rating}). Wygrywaj, żeby awansować – każdy kolejny przeciwnik będzie silniejszy!`)}</div></div>`;
 }
 function setPlaySub(s) {
+  if (!G.on) showSetup();
   for (const b of $('play-sub').children) b.classList.toggle('active', b.dataset.sub === s);
   for (const id of ['bots', 'career', 'online', 'lichess', 'engine']) $('play-' + id + '-pane').hidden = id !== s;
   if (s === 'career') renderCareer();
@@ -587,7 +590,15 @@ function renderOnlineRatings() {
   const r = A.profile().ratings;
   $('online-ratings').innerHTML = `<span class="pill accent">Bullet ${r.bullet}</span><span class="pill accent">Blitz ${r.blitz}</span><span class="pill accent">Rapid ${r.rapid}</span>`;
 }
-export function onShowPlayTab(name) { if (name === 'play' && G.chess && !$('play-game').hidden) view(); }
+function showSetup() {
+  $('play-setup').hidden = false; $('play-game').hidden = true; $('play-result').hidden = true;
+  if (G.chess && !G.on) { G.chess = null; A.S.train = null; A.render(); }
+}
+export function onShowPlayTab(name) {
+  if (name !== 'play') return;
+  if (G.on && G.chess) view();      // trwająca partia – wróć do niej
+  else showSetup();                  // zakończona – od razu wybór nowej gry
+}
 export function initPlay(api) {
   A = api;
   const sel = $('play-engine');
@@ -631,7 +642,7 @@ export function initPlay(api) {
     const r = e.target.closest('[data-r]')?.dataset.r;
     if (!r) return;
     if (r === 'review') { A.S.train = null; A.reviewPgn(G.pgn); }
-    if (r === 'new') { $('play-setup').hidden = false; $('play-game').hidden = true; G.chess = null; A.S.train = null; A.render(); closeNet(); if (G.mode === 'career') renderCareer(); }
+    if (r === 'new') { showSetup(); closeNet(); if (G.mode === 'career') renderCareer(); }
     if (r === 'rematch') {
       if (G.mode === 'online') { send({ t: 'rematch?' }); A.toast('Wysłano propozycję rewanżu.'); }
       else if (G.mode === 'lichess') lichessStart('ai');

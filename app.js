@@ -1551,6 +1551,25 @@ function commentShapes(m) {
   return out;
 }
 
+// ---------- telefon: szachownica na cały ekran i zwijany panel ----------
+function setBoardMax(on) {
+  document.body.classList.toggle('board-max', on);
+  $('btn-max').textContent = on ? '⤡' : '⤢';
+  const el = document.documentElement;
+  try { if (on && el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen().catch(() => {}); if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch {}
+  window.dispatchEvent(new Event('resize'));
+}
+$('btn-max').onclick = () => setBoardMax(!document.body.classList.contains('board-max'));
+$('board-exit')?.addEventListener('click', () => setBoardMax(false));
+function setPanelCollapsed(on) {
+  document.body.classList.toggle('panel-collapsed', on);
+  $('panel-toggle').textContent = on ? '▴' : '▾';
+  store.set('panelCollapsed', on);
+}
+$('panel-toggle').onclick = (e) => { e.stopPropagation(); setPanelCollapsed(!document.body.classList.contains('panel-collapsed')); };
+document.querySelector('.panel-head').addEventListener('click', (e) => { if (matchMedia('(max-width: 1000px)').matches && !e.target.closest('button')) setPanelCollapsed(!document.body.classList.contains('panel-collapsed')); });
+if (store.get('panelCollapsed', false)) setPanelCollapsed(true);
+
 // ---------- figurki ----------
 const FIG = { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘' };
 function figurine(san) {

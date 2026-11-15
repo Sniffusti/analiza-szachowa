@@ -906,3 +906,29 @@ body.zen .board-wrap { width: calc(min(calc(100vh - 110px), calc(100vw - 80px)) 
   .tab > .sec-title:first-of-type { display: none; }
 }
 @media (max-width: 1000px) { .tab > .sec-title { display: none; } }
+
+/* przyciski: pełny ekran planszy, zwijanie panelu */
+.panel-toggle { display: none; background: var(--raise); border: none; color: var(--text); width: 34px; height: 30px; border-radius: 8px; font-size: 15px; cursor: pointer; }
+.board-exit { display: none; }
+body.board-max .sidebar, body.board-max .panel, body.board-max .player { display: none !important; }
+body.board-max .app { padding: 0; justify-content: center; align-items: center; min-height: 100vh; }
+body.board-max .board-wrap { width: min(100vw - 32px, 100vh - 130px) !important; }
+body.board-max .board-exit { display: grid; place-items: center; position: fixed; top: calc(8px + env(safe-area-inset-top)); right: 8px; z-index: 80; width: 40px; height: 40px; border-radius: 50%; border: none; background: #000a; color: #fff; font-size: 18px; cursor: pointer; }
+body.board-max .tools .icon-btn:not(#btn-max):not(#btn-flip) { display: none; }
+@media (max-width: 1000px) {
+  /* plansza na pełną szerokość telefonu */
+  .board-wrap { width: calc(100vw - 16px - 24px) !important; max-width: none; }
+  .app { padding: 6px 8px; }
+  .evalbar { width: 14px; }
+  .board-row { gap: 4px; }
+  .panel-toggle { display: grid; place-items: center; margin-left: auto; margin-right: 6px; }
+  .panel-head { cursor: pointer; }
+  body.panel-collapsed .tab-body { display: none; }
+  /* pełny ekran na telefonie: plansza od krawędzi do krawędzi */
+  body.board-max .app { padding: 0; min-height: 100svh; }
+  body.board-max .board-row { gap: 0; }
+  body.board-max .evalbar { display: none; }
+  body.board-max .board-wrap { width: 100vw !important; border-radius: 0; outline: none; }
+  body.board-max .nav { padding: 0 8px; width: 100%; }
+  body.board-max .main { padding-bottom: 0; }
+}

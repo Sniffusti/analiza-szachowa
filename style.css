@@ -949,3 +949,22 @@ body.board-max .tools .icon-btn:not(#btn-max):not(#btn-flip) { display: none; }
 }
 @media (max-width: 1000px) { body.board-max .board-area { position: relative; } }
 @media (max-width: 1000px) { body.board-max .board-row { flex: 0 0 auto; } body.board-max #player-top { margin-top: auto; } body.board-max #player-bottom { margin-bottom: auto; } }
+/* telefon: opisy pól poza szachownicą (cyfry z prawej, litery pod spodem) */
+@media (max-width: 1000px) {
+  .board-wrap { width: calc(100vw - 16px - 24px - 14px) !important; margin: 0 14px 16px 0; overflow: visible; }
+  .cg-wrap coords { font: 600 11px/1 var(--mono) !important; }
+  .cg-wrap coords coord { color: var(--muted) !important; text-shadow: none !important; opacity: 1; }
+  .cg-wrap coords.ranks { left: auto !important; right: -13px; top: 0 !important; width: 10px; }
+  .cg-wrap coords.ranks coord { transform: none; display: flex; align-items: center; justify-content: center; }
+  .cg-wrap coords.files { left: 0 !important; bottom: -15px !important; height: 13px; text-align: center; }
+  body.board-max .board-wrap { width: calc(100vw - 14px) !important; margin: 0 14px 16px 0; }
+}
+/* pełny ekran na telefonie: sama kwadratowa plansza, ruchy przesunięciem palca */
+@media (max-width: 1000px) {
+  body.board-max .player, body.board-max .nav, body.board-max .tools, body.board-max .variation-banner { display: none !important; }
+  body.board-max .board-area { justify-content: center; }
+  body.board-max #player-top, body.board-max #player-bottom { margin: 0; }
+  body.board-max .board-wrap { width: calc(100vw - 14px) !important; }
+  body.board-max .max-hint { display: block; position: absolute; bottom: calc(env(safe-area-inset-bottom) + 14px); left: 0; right: 0; text-align: center; color: var(--muted); font-size: 12.5px; pointer-events: none; }
+}
+.max-hint { display: none; }

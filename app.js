@@ -1561,6 +1561,17 @@ function setBoardMax(on) {
 }
 $('btn-max').onclick = () => setBoardMax(!document.body.classList.contains('board-max'));
 $('board-exit')?.addEventListener('click', () => setBoardMax(false));
+// pełny ekran: przesunięcie palcem nad lub pod planszą = ruch wstecz / dalej
+{
+  let t0 = null;
+  document.addEventListener('touchstart', (e) => { if (document.body.classList.contains('board-max')) { const t = e.touches[0]; t0 = e.target.closest('.board-wrap, button') ? null : { x: t.clientX, y: t.clientY }; } }, { passive: true });
+  document.addEventListener('touchend', (e) => {
+    if (!t0 || !document.body.classList.contains('board-max')) return;
+    const t = e.changedTouches[0], dx = t.clientX - t0.x, dy = t.clientY - t0.y, start = t0; t0 = null;
+    if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
+    $(dx < 0 ? 'nav-next' : 'nav-prev').click();
+  }, { passive: true });
+}
 function setPanelCollapsed(on) {
   document.body.classList.toggle('panel-collapsed', on);
   $('panel-toggle').textContent = on ? '▴' : '▾';

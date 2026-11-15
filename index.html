@@ -136,6 +136,7 @@
                 <span class="engine-meta" id="live-status"></span>
                 <select id="live-engine" title="Silnik"></select>
                 <button class="btn small" id="btn-threat" title="Pokaż, co zagraża (klawisz X)">Zagrożenie</button>
+                <button class="btn small" id="btn-arrow" title="Pokaż / ukryj strzałkę najlepszego ruchu (klawisz A)">Strzałka</button>
                 <select id="live-multipv" title="Liczba linii"><option value="1">1 linia</option><option value="2">2 linie</option><option value="3" selected>3 linie</option><option value="4">4 linie</option><option value="5">5 linii</option></select>
               </div>
               <div class="lines" id="lines"></div>
@@ -561,6 +562,9 @@
           </div>
           <h3>Zestaw bierek</h3>
           <div class="grid pieces" id="piece-grid"></div>
+          <h3>Król przy nazwach graczy</h3>
+          <p class="muted">Ikonka przy „Białe” / „Czarne” – może być z innego zestawu niż bierki na planszy.</p>
+          <div class="grid pieces" id="king-grid"></div>
           <h3>Szachownica</h3>
           <div class="card board-prefs">
             <label>Rozmiar szachownicy <input type="range" id="bp-size" min="60" max="100" step="5"></label>

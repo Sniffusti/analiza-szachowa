@@ -120,6 +120,7 @@ const S = {
     board: store.get('board', 'brown.png'),
     coords: store.get('coords', true),
     arrow: store.get('arrow', true),
+    kingSet: store.get('kingSet', ''),
     badges: store.get('badges', true),
   },
 };
@@ -479,7 +480,7 @@ function renderPlayers() {
   const b = `${esc(h.Black || 'Czarne')} <small>${esc(h.BlackElo || '')}</small>${materialHtml(fen, 'b')}`;
   $('strip-game').textContent = `${h.White || 'Białe'} – ${h.Black || 'Czarne'}${h.Date && !String(h.Date).startsWith('?') ? ' · ' + h.Date : ''}`;
   $('strip-mode').textContent = T ? 'Tryb: trening' : S.explore ? 'Tryb: wariant' : S.review ? 'Tryb: raport' : 'Tryb: analiza';
-  const kIco = (c) => `<img class="pl-king" src="${pieceUrl(S.settings.pieceSet, c + 'K')}" alt="">`;
+  const kIco = (c) => `<img class="pl-king" src="${pieceUrl((S.pieces[S.settings.kingSet] && S.settings.kingSet) || S.settings.pieceSet, c + 'K')}" alt="">`;
   $('player-top').innerHTML = orient === 'white' ? kIco('b') + b : kIco('w') + w;
   $('player-bottom').innerHTML = orient === 'white' ? kIco('w') + w : kIco('b') + b;
 }
@@ -1395,6 +1396,9 @@ function renderSettings() {
     `<button data-set="${s}" class="${s === S.settings.pieceSet ? 'on' : ''}" style="background-image:url('${pieceUrl(s, 'wN')}')" title="${s}"><span>${s}</span></button>`).join('');
   $('board-grid').innerHTML = BOARDS.map((b) =>
     `<button data-board="${b}" class="${b === S.settings.board ? 'on' : ''}" style="background-image:url('board/${b}')" title="${b}"><span>${b.replace(/\..*$/, '').replace('svg/', '')}</span></button>`).join('');
+  $('king-grid').innerHTML = `<button data-king="" class="${!S.settings.kingSet ? 'on' : ''}" style="background-image:url('${pieceUrl(S.settings.pieceSet, 'wK')}')" title="Jak bierki"><span>jak bierki</span></button>` +
+    Object.keys(S.pieces).sort().map((s) => `<button data-king="${s}" class="${s === S.settings.kingSet ? 'on' : ''}" style="background-image:url('${pieceUrl(s, 'wK')}')" title="${s}"><span>${s}</span></button>`).join('');
+  $('btn-arrow').classList.toggle('on', S.settings.arrow);
   $('opt-coords').checked = S.settings.coords;
   $('opt-arrow').checked = S.settings.arrow;
   $('opt-badges').checked = S.settings.badges;
@@ -1403,12 +1407,22 @@ $('piece-grid').onclick = (e) => {
   const b = e.target.closest('[data-set]'); if (!b) return;
   S.settings.pieceSet = b.dataset.set; store.set('pieceSet', b.dataset.set); applyPieceSet(); renderSettings(); render();
 };
+$('king-grid').onclick = (e) => {
+  const b = e.target.closest('[data-king]'); if (!b) return;
+  S.settings.kingSet = b.dataset.king; store.set('kingSet', b.dataset.king); renderSettings(); render();
+};
+function setArrow(on) {
+  S.settings.arrow = on; store.set('arrow', on);
+  $('opt-arrow').checked = on; $('btn-arrow').classList.toggle('on', on);
+  drawShapes();
+}
+$('btn-arrow').onclick = () => setArrow(!S.settings.arrow);
 $('board-grid').onclick = (e) => {
   const b = e.target.closest('[data-board]'); if (!b) return;
   S.settings.board = b.dataset.board; store.set('board', b.dataset.board); applyBoard(); renderSettings();
 };
 for (const [id, key] of [['opt-coords', 'coords'], ['opt-arrow', 'arrow'], ['opt-badges', 'badges']]) {
-  $(id).onchange = () => { S.settings[key] = $(id).checked; store.set(key, $(id).checked); applyBoard(); drawShapes(); };
+  $(id).onchange = () => { S.settings[key] = $(id).checked; store.set(key, $(id).checked); applyBoard(); drawShapes(); $('btn-arrow').classList.toggle('on', S.settings.arrow); };
 }
 $('btn-token').onclick = async () => {
   const tok = $('li-token').value.trim();
@@ -1884,6 +1898,7 @@ async function init() {
     newAnalysis: () => { setGame(gameFromFen(new Chess().fen())); showTab('analysis'); setAnSub('engine'); },
     anSub: (s) => setAnSub(s),
     editor: () => { showTab('analysis'); openEditor(); },
+    toggleArrow: () => $('btn-arrow').click(),
     threat: () => { if (!$('tab-analysis').hidden || !$('tab-report').hidden) showThreat(); },
     loadPgn: (t) => { loadPgnText(t, { review: false }); showTab('analysis'); setAnSub('engine'); },
   });

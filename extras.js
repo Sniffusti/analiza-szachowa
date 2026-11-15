@@ -70,7 +70,7 @@ function renderPalette() {
 }
 
 function shortcuts() {
-  const rows = [['Ctrl + K', 'Wyszukiwarka – przejdź gdziekolwiek'], ['← →', 'Poprzedni / następny ruch'], ['Home / End', 'Początek / koniec partii'], ['F', 'Obróć szachownicę'], ['X', 'Pokaż zagrożenie przeciwnika'], ['Z', 'Tryb Zen (sama szachownica)'], ['Esc', 'Wróć z wariantu do partii'], ['Prawy klik', 'Strzałki i kółka na planszy; w partii anuluje premove'], ['?', 'Ta lista skrótów']];
+  const rows = [['Ctrl + K', 'Wyszukiwarka – przejdź gdziekolwiek'], ['← →', 'Poprzedni / następny ruch'], ['Home / End', 'Początek / koniec partii'], ['F', 'Obróć szachownicę'], ['X', 'Pokaż zagrożenie przeciwnika'], ['A', 'Strzałka najlepszego ruchu – włącz / wyłącz'], ['Z', 'Tryb Zen (sama szachownica)'], ['Esc', 'Wróć z wariantu do partii'], ['Prawy klik', 'Strzałki i kółka na planszy; w partii anuluje premove'], ['?', 'Ta lista skrótów']];
   $('modal').hidden = false;
   $('modal-body').innerHTML = `<h3 style="margin-top:0">Skróty klawiszowe</h3><table class="keys">${rows.map(([k, d]) => `<tr><td><kbd>${esc(k)}</kbd></td><td>${esc(d)}</td></tr>`).join('')}</table>`;
 }
@@ -180,6 +180,7 @@ export function initExtras(api) {
     if (e.key === '?') { shortcuts(); }
     else if (e.key === 'z' || e.key === 'Z') toggleZen();
     else if (e.key === 'x' || e.key === 'X') A.threat();
+    else if ((e.key === 'a' || e.key === 'A') && !e.ctrlKey && !e.metaKey) A.toggleArrow?.();
     else if (e.key === 'Escape') { closePalette(); $('modal').hidden = true; if (document.body.classList.contains('zen')) toggleZen(false); }
   });
   $('sb-search').onclick = openPalette;

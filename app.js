@@ -1705,7 +1705,7 @@ async function init() {
     loadPgnText: (t) => { S.train = null; loadPgnText(t, { review: false }); },
   });
   HOME_API = {
-    store, profile, avatarHtml, streak, apiFetch, showTab, pushRating, ratingHistory, reviewPgn: (pgn) => { loadPgnText(pgn, { review: true }); showTab('report'); },
+    store, profile, avatarHtml, streak, apiFetch, showTab, pushRating, ratingHistory, lichessToken, reviewPgn: (pgn) => { loadPgnText(pgn, { review: true }); showTab('report'); },
     pieceUrl: (k) => pieceUrl(S.settings.pieceSet, k), repDue, repCoverFen, quickPlay, playBots, playCareer, playFriend, openPuzzles,
     openDrills: (id) => { showTab('study'); setStudySub('drills'); if (id) startDrill(id, 'learn'); },
   };

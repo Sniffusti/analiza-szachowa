@@ -175,17 +175,29 @@ async function renderRatings(src) {
         card('puzzle', pz.rating, A.ratingHistory('puzzle')), card('career', p.career.rating, A.ratingHistory('career')), card('bots', p.rating, A.ratingHistory('bots'))];
     } else if (src === 'lichess') {
       if (!p.lichess) { box.innerHTML = '<p class="muted">Podaj nick z lichess w profilu (Ustawienia).</p>'; return; }
-      const key = 'liHist:' + p.lichess + ':' + new Date().toISOString().slice(0, 13);
+      const u = encodeURIComponent(p.lichess);
+      const key = 'liHist2:' + p.lichess + ':' + new Date().toISOString().slice(0, 13);
       let hist = A.store.get('liHistCache', null);
       if (!hist || hist.key !== key) {
-        const r = await fetch(`https://lichess.org/api/user/${encodeURIComponent(p.lichess)}/rating-history`);
-        hist = { key, data: await r.json() };
+        // historia rankingu wymaga zalogowania (token z logowania przez lichess albo z ustawień serwera)
+        const tok = A.lichessToken?.();
+        const rh = tok ? await fetch(`https://lichess.org/api/user/${u}/rating-history`, { headers: { Authorization: 'Bearer ' + tok } })
+          : await A.apiFetch('lichess', `api/user/${u}/rating-history`, 'application/json');
+        const prof = await fetch(`https://lichess.org/api/user/${u}`).then((r) => r.json()).catch(() => ({}));
+        hist = { key, data: await rh.json().catch(() => []), perfs: prof.perfs || {} };
         A.store.set('liHistCache', hist);
       }
-      const get = (name) => (hist.data.find((x) => x.name === name)?.points || []).map(([y, m, d, v]) => ({ t: new Date(y, m, d).getTime(), v })).slice(-120);
-      const last = (a) => a.length ? a[a.length - 1].v : null;
-      const map = { blitz: 'Blitz', rapid: 'Rapid', bullet: 'Bullet', daily: 'Correspondence', puzzle: 'Puzzles' };
-      items = Object.entries(map).map(([k, n]) => { const h = get(n); return card(k, last(h), h); }).filter((it) => it.rating);
+      const get = (name) => ((hist.data || []).find((x) => x.name.toLowerCase() === name)?.points || []).map(([y, m, d, v]) => ({ t: new Date(y, m, d).getTime(), v })).slice(-120);
+      const map = { blitz: 'blitz', rapid: 'rapid', bullet: 'bullet', daily: 'correspondence', puzzle: 'puzzle' };
+      items = Object.entries(map).map(([k, n]) => {
+        const perf = hist.perfs?.[n];
+        if (!perf?.games) return null;
+        const h = get(n);
+        const it = card(k, perf.rating, h.length ? h : [{ t: Date.now(), v: perf.rating }]);
+        if (!h.length && perf.prog) it.delta = perf.prog;
+        return it;
+      }).filter(Boolean);
+      if (!(hist.data || []).some((x) => x.points?.length)) items.note = 'Wykresy historii lichess pokazuje tylko po zalogowaniu (Ustawienia → Konto → Zaloguj przez lichess).';
     } else {
       if (!p.chesscom) { box.innerHTML = '<p class="muted">Podaj nick z chess.com w profilu (Ustawienia).</p>'; return; }
       const r = await A.apiFetch('chesscom', `pub/player/${encodeURIComponent(p.chesscom.toLowerCase())}/stats`);
@@ -195,7 +207,7 @@ async function renderRatings(src) {
       items = Object.entries(cur).filter(([, v]) => v).map(([k, v]) => { A.pushRating('cc:' + k, v); return card(k, v, A.ratingHistory('cc:' + k)); });
     }
   } catch (e) { box.innerHTML = `<p class="muted">Nie udało się pobrać rankingów (${esc(e.message)}).</p>`; return; }
-  box.innerHTML = items.length ? ratingCards(items) : `<p class="muted">${src === 'lichess' ? 'To konto na lichess nie ma jeszcze partii rankingowych.' : 'Brak rankingów.'}</p>`;
+  box.innerHTML = items.length ? ratingCards(items) + (items.note ? `<p class="muted">${esc(items.note)}</p>` : '') : `<p class="muted">${src === 'lichess' ? 'To konto na lichess nie ma jeszcze partii rankingowych.' : 'Brak rankingów.'}</p>`;
   bindCharts(box);
   fx.enter(box.querySelectorAll('.rcard'), { step: 50 });
   for (const b of box.querySelectorAll('.rc-top b')) { const v = parseFloat(b.textContent); if (!isNaN(v)) fx.countUp(b, v, 0); }

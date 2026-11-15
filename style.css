@@ -723,3 +723,8 @@ svg.ph { display: block; }
 .mat b { color: #e8e5dc; font-size: 13px; margin-left: 6px; }
 .clock .who .mat piece { width: 21px; height: 21px; }
 .player { min-height: 32px; }
+/* współrzędne pól – większe i czytelne na jasnych i ciemnych polach */
+.cg-wrap coords { font: 800 13px/1 var(--sans); text-transform: lowercase; }
+.cg-wrap coords coord { color: #fff; opacity: 1; text-shadow: 0 0 2px #000, 0 0 2px #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.cg-wrap coords.ranks { left: 3px; top: 3px; }
+.cg-wrap coords.files { bottom: 2px; left: 4px; }

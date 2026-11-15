@@ -7,10 +7,12 @@ import { idb } from './store.js';
 import * as fx from './fx.js';
 import { materialHtml } from './material.js';
 import { icon } from './icons.js';
+import { initExtras, onShowExtrasTab } from './extras.js';
 import { initTraining, onShowTab, addMistakesFromReview, drills, openPuzzles, repDue, repCoverFen, startDrill } from './train.js';
-import { initHome, renderHome, miniBoard } from './home.js';
+import { initHome, renderHome, miniBoard, renderRatings } from './home.js';
+import { renderProfilePage } from './profilepage.js';
 import { initStudy, onShowStudyTab, catSays, setStudySub } from './study.js';
-import { initPlay, onShowPlayTab, quickPlay, playBots, playCareer, playFriend } from './play.js';
+import { initPlay, onShowPlayTab, quickPlay, playBots, playCareer, playFriend, playFromFen } from './play.js';
 import { initProfile, profile, saveProfile, lichessToken, lichessUser, avatarHtml, markActive, streak, pushRating, ratingHistory } from './profile.js';
 
 // ---------- narzędzia ----------
@@ -261,6 +263,7 @@ function drawShapes() {
   const fen = curFen();
   const cur = currentMoveReview();
   if (S.settings.badges && cur?.r) shapes.push({ orig: cur.mv.to, customSvg: { html: badgeSvg(cur.r.cls) } });
+  if (S.threat?.fen === fen && S.threat.uci) shapes.push({ orig: S.threat.uci.slice(0, 2), dest: S.threat.uci.slice(2, 4), brush: 'red' });
   if (S.settings.arrow) {
     const ev = getEval(fen);
     if (ev?.pv?.length) shapes.push({ orig: ev.pv[0].slice(0, 2), dest: ev.pv[0].slice(2, 4), brush: 'paleBlue' });
@@ -443,6 +446,8 @@ function render() {
     scheduleExplorer();
     startLive();
     $('btn-lichess').href = 'https://lichess.org/analysis/standard/' + curFen().replace(/ /g, '_');
+    if (!S.train && !$('tab-analysis').hidden) updateEngineExtra();
+    if (S.threat && S.threat.fen !== curFen()) { S.threat = null; $('btn-threat')?.classList.remove('on'); }
   }, 0);
 }
 
@@ -1351,9 +1356,10 @@ document.addEventListener('keydown', (e) => {
 $('board').addEventListener('wheel', (e) => { e.preventDefault(); go(e.deltaY > 0 ? 1 : -1); }, { passive: false });
 
 // ---------- zakładki ----------
-const PAGE_TITLES = { home: 'Shakkusti', play: 'Graj', puzzles: 'Zadania', study: 'Ucz się', train: 'Trener', analysis: 'Analiza', report: 'Przegląd partii', openings: 'Otwarcia', import: 'Import', settings: 'Ustawienia' };
+const PAGE_TITLES = { profile: 'Profil', home: 'Shakkusti', play: 'Graj', puzzles: 'Zadania', study: 'Ucz się', train: 'Trener', analysis: 'Analiza', report: 'Przegląd partii', openings: 'Otwarcia', import: 'Import', settings: 'Ustawienia' };
 function showTab(name) {
-  document.querySelector('.app').hidden = name === 'home';
+  document.querySelector('.app').hidden = name === 'home' || name === 'profile';
+  if (name === 'profile') renderProfilePage({ ...HOME_API, lichessToken, renderRatingsInto: (box, src) => renderRatings(src, box) });
   $('page-title').textContent = PAGE_TITLES[name] || '';
   if (name === 'home') renderHome(HOME_API);
   store.set('lastTab', name);
@@ -1367,6 +1373,7 @@ function showTab(name) {
   onShowTab(name);
   onShowStudyTab(name);
   onShowPlayTab(name);
+  onShowExtrasTab(name);
   if (name !== 'home') fx.enter(document.querySelectorAll(`#tab-${name} > *`), { step: 30, dist: 6 });
 }
 let HOME_API = null;
@@ -1420,6 +1427,71 @@ function soundStatus() {
 setInterval(soundStatus, 1500);
 document.getElementById('snd-unlock').onclick = async () => { sound.ensureCtx(); await sound.ctx?.resume?.(); sound.preload(); sound.play('Move'); soundStatus(); };
 $('snd-test').onclick = () => { const seq = ['Move', 'Capture', 'Check', 'Checkmate']; seq.forEach((n, i) => setTimeout(() => sound.play(n), i * 450)); };
+
+// ---------- zagrożenie (jak klawisz X na lichess): co zagrałby przeciwnik, gdyby był jego ruch ----------
+async function showThreat() {
+  const fen = curFen();
+  if (S.threat?.fen === fen) { S.threat = null; drawShapes(); $('btn-threat').classList.remove('on'); return; }
+  const c = new Chess(fen);
+  if (c.inCheck()) return toast('Jest szach – zagrożenie widać od razu.');
+  const f = fen.split(' ');
+  f[1] = f[1] === 'w' ? 'b' : 'w'; f[3] = '-';
+  const nf = f.join(' ');
+  try { new Chess(nf); } catch { return; }
+  $('btn-threat').classList.add('on');
+  const id = $('review-engine').value;
+  await auxEngine.setEngine(id);
+  const res = await auxEngine.analyse(nf, id === 'lc0' ? { nodes: 600 } : { depth: id === WASM_ID ? 12 : 16 });
+  const uci = res?.bestmove || res?.lines[0]?.pv?.[0];
+  if (!uci || curFen() !== fen) return;
+  const san = C.playLine(nf, [uci], 1).steps[0]?.san;
+  S.threat = { fen, uci };
+  drawShapes();
+  toast(`Zagrożenie: ${san} (${C.formatEval(res.lines[0])})`);
+}
+$('btn-threat').onclick = showThreat;
+
+// ---------- baza końcówek (≤7 bierek) i ocena z chmury lichess ----------
+let extraTimer = null;
+function updateEngineExtra() {
+  clearTimeout(extraTimer);
+  extraTimer = setTimeout(async () => {
+    const fen = curFen();
+    const box = $('engine-extra');
+    const pieces = (fen.split(' ')[0].match(/[a-zA-Z]/g) || []).length;
+    try {
+      if (pieces <= 7) {
+        const r = await fetch(`https://tablebase.lichess.ovh/standard?fen=${encodeURIComponent(fen)}`);
+        if (!r.ok || curFen() !== fen) return;
+        const t = await r.json();
+        const side = fen.split(' ')[1] === 'w' ? 'Białe' : 'Czarne';
+        const cat = { win: `${side} wygrywają`, loss: `${side} przegrywają`, draw: 'Remis', 'cursed-win': 'Wygrana (ale 50 ruchów → remis)', 'blessed-loss': 'Przegrana (50 ruchów ratuje)', unknown: 'Nieznane' }[t.category] || t.category;
+        const dtm = t.dtm ? ` · mat w ${Math.ceil(Math.abs(t.dtm) / 2)}` : '';
+        const moves = (t.moves || []).slice(0, 6).map((m) => {
+          const k = m.category === 'loss' ? 'win' : m.category === 'win' ? 'loss' : 'draw';
+          return `<button class="tb-move ${k}" data-uci="${m.uci}" title="${m.dtm ? 'mat w ' + Math.ceil(Math.abs(m.dtm) / 2) : ''}">${figurine(m.san)}</button>`;
+        }).join('');
+        box.innerHTML = `<b>Baza końcówek:</b> ${esc(cat)}${dtm}<div class="tb-moves">${moves}</div>`;
+        box.hidden = false;
+        return;
+      }
+      const cloudOk = $('live-engine').value === WASM_ID;
+      if (!cloudOk) { box.hidden = true; return; }
+      const r = await fetch(`https://lichess.org/api/cloud-eval?fen=${encodeURIComponent(fen)}&multiPv=1`);
+      if (!r.ok || curFen() !== fen) { box.hidden = true; return; }
+      const j = await r.json();
+      const pv = j.pvs?.[0];
+      if (!pv) { box.hidden = true; return; }
+      const sign = fen.split(' ')[1] === 'w' ? 1 : -1;
+      const ev = pv.mate !== undefined ? { mate: pv.mate * sign, cp: null } : { cp: pv.cp * sign, mate: null };
+      void sign;
+      const first = C.playLine(fen, pv.moves.split(' '), 1).steps[0]?.san;
+      box.innerHTML = `<b>Chmura lichess</b> (głęb. ${j.depth}): <span class="score ${C.winPct({ cp: pv.cp, mate: pv.mate }) >= 50 ? 'w' : 'b'}">${C.formatEval({ cp: pv.cp ?? null, mate: pv.mate ?? null })}</span> najlepszy ${esc(first || '')}`;
+      box.hidden = false;
+    } catch { box.hidden = true; }
+  }, 400);
+}
+$('engine-extra').addEventListener('click', (e) => { const b = e.target.closest('[data-uci]'); if (b) playUci(b.dataset.uci); });
 
 // ---------- figurki ----------
 const FIG = { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘' };
@@ -1715,13 +1787,25 @@ async function init() {
     S, render, sound, toast, store, catSays, profile, saveProfile, lichessToken, lichessUser, avatarHtml, markActive, showTab, cg, pushRating,
     reviewPgn: (pgn) => { loadPgnText(pgn, { review: true }); showTab('report'); },
   });
+  const EX = initExtras({
+    S, cg, store, toast, sound, render, showTab, exportPgn, openPuzzles,
+    play: { bots: playBots, career: playCareer, friend: playFriend },
+    playFromPosition: () => playFromFen(curFen()),
+    openDrills: () => { showTab('study'); setStudySub('drills'); },
+    newAnalysis: () => { setGame(gameFromFen(new Chess().fen())); showTab('analysis'); setAnSub('engine'); },
+    anSub: (s) => setAnSub(s),
+    editor: () => { showTab('analysis'); openEditor(); },
+    threat: () => { if (!$('tab-analysis').hidden || !$('tab-report').hidden) showThreat(); },
+    loadPgn: (t) => { loadPgnText(t, { review: false }); showTab('analysis'); setAnSub('engine'); },
+  });
+  $('btn-play-pos').onclick = () => playFromFen(curFen());
   initStudy({
     S, render, sound, toast, store, apiFetch, drills,
     loadPgnText: (t) => { S.train = null; loadPgnText(t, { review: false }); showTab('analysis'); },
   });
   renderReportSummary();
   render();
-  if (!new URLSearchParams(location.search).get('join')) showTab('home');
+  if (EX.loadFromHash()) { /* partia z udostępnionego linku */ } else if (!new URLSearchParams(location.search).get('join')) showTab('home');
 }
 init();
 

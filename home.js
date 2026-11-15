@@ -163,8 +163,7 @@ function card(key, rating, history) {
   const delta = h.length >= 2 ? h[h.length - 1].v - h[Math.max(0, h.length - 11)].v : 0;
   return { icon: ic, color, label, rating, delta, history: h.length ? h : (rating ? [{ t: Date.now(), v: rating }] : []) };
 }
-async function renderRatings(src) {
-  const box = document.getElementById('rating-cards');
+export async function renderRatings(src, box = document.getElementById('rating-cards')) {
   if (!box) return;
   const p = A.profile();
   let items = [];

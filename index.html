@@ -36,6 +36,7 @@
       <button data-tab="openings"><span class="ni" style="--c:#d58bf0">❖</span><em>Otwarcia</em></button>
       <button data-tab="import"><span class="ni" style="--c:#9aa3b5">⇩</span><em>Import</em></button>
     </nav>
+    <button class="sb-search" id="sb-search" title="Szukaj (Ctrl+K)"><span class="ni" style="--c:#9aa3b5">⌕</span><em>Szukaj</em><kbd>Ctrl K</kbd></button>
     <div class="sb-account">
       <button class="sb-user" id="sb-user" title="Twój profil"></button>
       <div class="sb-icons">
@@ -47,6 +48,7 @@
   </aside>
   <main class="main">
     <div class="tab page" id="tab-home" hidden></div>
+    <div class="tab page" id="tab-profile" hidden></div>
   <div class="app">
     <section class="board-area">
       <div class="player top" id="player-top"></div>
@@ -79,6 +81,7 @@
         <button class="icon-btn" id="btn-copy-pgn" title="Kopiuj PGN">PGN</button>
         <button class="icon-btn" id="btn-copy-fen" title="Kopiuj FEN">FEN</button>
         <button class="icon-btn" id="btn-save" title="Zapisz analizę">♥</button>
+        <button class="icon-btn" id="btn-share" title="Udostępnij partię linkiem">🔗</button>
         <a class="icon-btn" id="btn-lichess" target="_blank" rel="noopener" title="Otwórz pozycję na lichess">↗</a>
       </div>
     </section>
@@ -127,14 +130,16 @@
                 <label class="toggle"><input type="checkbox" id="live-on" checked><span class="knob"></span><b>Analiza</b></label>
                 <span class="engine-meta" id="live-status"></span>
                 <select id="live-engine" title="Silnik"></select>
+                <button class="btn small" id="btn-threat" title="Pokaż, co zagraża (klawisz X)">Zagrożenie</button>
                 <select id="live-multipv" title="Liczba linii"><option value="1">1 linia</option><option value="2">2 linie</option><option value="3" selected>3 linie</option><option value="4">4 linie</option><option value="5">5 linii</option></select>
               </div>
               <div class="lines" id="lines"></div>
+              <div class="engine-extra" id="engine-extra" hidden></div>
               <div class="engine-foot" id="engine-opening">◎ –</div>
             </div>
             <div class="coach" id="coach-analysis" hidden></div>
             <div class="moves" id="moves-analysis"></div>
-            <div class="row"><button class="btn" data-save="1">♥ Zapisz analizę</button><button class="btn" data-go2="saved">Zapisane analizy</button></div>
+            <div class="row"><button class="btn" data-save="1">♥ Zapisz analizę</button><button class="btn" data-go2="saved">Zapisane analizy</button><button class="btn primary" id="btn-play-pos">♟ Graj od tej pozycji</button></div>
             <p class="hint">Przesuń bierkę, żeby sprawdzić inny ruch. Kliknij ruch w linii silnika, żeby go zagrać.</p>
           </div>
 
@@ -389,8 +394,10 @@
             <button data-sub="puzzles">Zadania</button>
             <button data-sub="rush">Puzzle Rush</button>
             <button data-sub="mistakes">Moje błędy</button>
+            <button data-sub="coords">Współrzędne</button>
           </div>
           <div class="train-pane" id="train-pzhome"></div>
+          <div class="train-pane" id="train-coords" hidden><div id="coords-box"></div></div>
           <div class="train-pane" id="train-puzzles" hidden>
             <div class="row">
               <select id="pz-theme" style="flex:1"></select>
@@ -415,6 +422,7 @@
               <button class="btn primary" data-rush="3">3 minuty</button>
               <button class="btn primary" data-rush="5">5 minut</button>
               <button class="btn" data-rush="survival">Przetrwanie (3 błędy)</button>
+              <button class="btn" data-rush="streak">Seria (1 błąd, bez czasu)</button>
             </div>
             <div class="muted" id="rush-best"></div>
             <div class="pz-box" id="rush-box"></div>
@@ -496,6 +504,11 @@
           <h3>Zestaw bierek</h3>
           <div class="grid pieces" id="piece-grid"></div>
           <h3>Szachownica</h3>
+          <div class="card board-prefs">
+            <label>Rozmiar szachownicy <input type="range" id="bp-size" min="60" max="100" step="5"></label>
+            <label class="check"><input type="checkbox" id="bp-dests"> Pokazuj możliwe ruchy (kropki)</label>
+            <label>Animacja ruchów <select id="bp-anim"><option value="0">Brak</option><option value="120">Szybka</option><option value="160">Normalna</option><option value="260">Wolna</option></select></label>
+          </div>
           <div class="grid boards" id="board-grid"></div>
           <h3>Widok</h3>
           <label class="check"><input type="checkbox" id="opt-coords" checked> Współrzędne</label>

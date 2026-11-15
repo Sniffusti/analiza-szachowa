@@ -133,7 +133,8 @@ function startTimer() {
   }, 100);
 }
 function pgnOf(result) {
-  const c = new Chess();
+  const start = G.chess.history({ verbose: true })[0]?.before;
+  const c = new Chess(start || undefined);
   for (const san of G.chess.history()) c.move(san);
   const h = G.headers;
   c.setHeader('Event', h.Event); c.setHeader('Site', h.Site || 'Analiza');
@@ -183,10 +184,10 @@ function resetChat(on) {
   if (on) addChat('', 'Czat z przeciwnikiem – bądź miły 🙂', false, true);
 }
 
-function beginGame({ mode, color, tc, oppName, oppAva, oppRating, myRating, event, elo }) {
+function beginGame({ mode, color, tc, oppName, oppAva, oppRating, myRating, event, elo, fen }) {
   const [base, inc] = String(tc || '0').split('+').map(Number);
   Object.assign(G, {
-    chess: new Chess(), color, on: true, mode, last: null, tc: String(tc || '0'), queue: [], pendingUci: null, viewPly: null,
+    chess: new Chess(fen || undefined), color, on: true, mode, last: null, tc: String(tc || '0'), queue: [], pendingUci: null, viewPly: null,
     clocks: base ? { w: base * 60000, b: base * 60000 } : null, inc: (inc || 0) * 1000,
     oppName, oppAva, oppRating, myRating, elo,
   });
@@ -271,8 +272,9 @@ async function startBotGame(bot, opts = {}) {
   beginGame({
     mode, color, tc: opts.tc ?? $('bot-tc').value, oppName: bot.name, oppAva: botAva(bot), oppRating: bot.elo, elo: bot.elo,
     myRating: mode === 'career' ? p.career.rating : p.rating, event: mode === 'career' ? `Kariera: ${bot.name} (${bot.elo})` : `${bot.name} (${bot.elo})`,
+    fen: opts.fen,
   });
-  if (color === 'b') engineMove();
+  if (G.chess.turn() !== color) engineMove();
 }
 
 // ---------------------------------------------------------------- koniec partii
@@ -655,6 +657,14 @@ export function initPlay(api) {
   setPlaySub(A.store.get('playSub', 'bots'));
   const q = new URLSearchParams(location.search);
   if (q.get('join')) { const j = q.get('join'), tc = q.get('tc'); history.replaceState(null, '', location.pathname); joinFriend(j, tc); }
+}
+/** „Graj od tej pozycji”: gracz prowadzi stronę, która jest na ruchu, przeciwnik = wybrany bot. */
+export function playFromFen(fen) {
+  try { new Chess(fen); } catch { return A.toast('Niepoprawna pozycja.'); }
+  const c = new Chess(fen);
+  if (c.isGameOver()) return A.toast('W tej pozycji partia jest już zakończona.');
+  A.showTab('play'); setPlaySub('bots');
+  startBotGame(selectedBot, { color: c.turn(), tc: '0', fen });
 }
 export function quickPlay(tc) { A.showTab('play'); setPlaySub('online'); $('online-tc').value = tc; matchmake(); }
 export function playBots() { A.showTab('play'); setPlaySub('bots'); }

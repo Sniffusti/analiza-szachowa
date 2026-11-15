@@ -53,8 +53,9 @@ export function onShowTab(name) {
   if (name === 'train') renderTutorReport();
 }
 /** Wejście z zewnątrz (strona główna): otwiera Zadania w danym trybie. */
-export function openPuzzles(mode) {
+export function openPuzzles(mode, variant) {
   A.showTab('puzzles');
+  if (mode === 'rush' && variant) { setSub('rush'); return startRush(variant); }
   if (mode === 'daily') { setSub('puzzles'); return runDaily(); }
   setSub(mode);
   if (mode === 'puzzles' && !current) nextLichessPuzzle();
@@ -279,11 +280,11 @@ function rushUi() {
   $('rush-score').textContent = RU.score ?? 0;
   $('rush-strikes').innerHTML = [0, 1, 2].map((i) => `<span class="${i < (RU.strikes || 0) ? 'x' : ''}">${i < (RU.strikes || 0) ? '✕' : '○'}</span>`).join('');
   const best = A.store.get('rushBest', {});
-  $('rush-best').textContent = `Rekordy: 3 min – ${best['3'] || 0} · 5 min – ${best['5'] || 0} · przetrwanie – ${best.survival || 0}`;
+  $('rush-best').textContent = `Rekordy: 3 min – ${best['3'] || 0} · 5 min – ${best['5'] || 0} · przetrwanie – ${best.survival || 0} · seria – ${best.streak || 0}`;
 }
 async function startRush(mode) {
   clearInterval(RU.timer);
-  Object.assign(RU, { on: true, mode, score: 0, strikes: 0, end: mode === 'survival' ? null : Date.now() + (+mode) * 60000, next: null });
+  Object.assign(RU, { on: true, mode, score: 0, strikes: 0, maxStrikes: mode === 'streak' ? 1 : 3, end: mode === 'survival' || mode === 'streak' ? null : Date.now() + (+mode) * 60000, next: null });
   $('rush-start-row').hidden = true;
   rushUi();
   RU.timer = setInterval(() => {
@@ -310,7 +311,7 @@ async function nextRush() {
     onDone(ok) {
       if (ok) RU.score++; else RU.strikes++;
       rushUi();
-      if (RU.strikes >= 3) endRush('Trzy błędy!');
+      if (RU.strikes >= RU.maxStrikes) endRush(RU.mode === 'streak' ? 'Koniec serii!' : 'Trzy błędy!');
     },
     next: () => RU.on && nextRush(),
   }, 'rush-box');
@@ -913,5 +914,5 @@ export function initTraining(api) {
     if (e.target.closest('[data-go="mistakes"]')) { A.showTab('puzzles'); setSub('mistakes'); nextMistake(); }
   });
   renderPzStats();
-  setSub((['pzhome', 'puzzles', 'rush', 'mistakes'].includes(A.store.get('trainSub', 'pzhome')) ? A.store.get('trainSub', 'pzhome') : 'pzhome'));
+  setSub((['pzhome', 'puzzles', 'rush', 'mistakes', 'coords'].includes(A.store.get('trainSub', 'pzhome')) ? A.store.get('trainSub', 'pzhome') : 'pzhome'));
 }

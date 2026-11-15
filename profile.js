@@ -155,7 +155,7 @@ export function initProfile(api) {
     renderProfile();
   };
   $('pf-del-ava').onclick = () => { const p = profile(); p.avatar = ''; saveProfile(p); renderProfile(); };
-  document.getElementById('sb-user').onclick = () => { A.showTab('settings'); };
+  document.getElementById('sb-user').onclick = () => { A.showTab(profile().name ? 'profile' : 'settings'); };
   $('profile-badge').onclick = () => { A.showTab('settings'); $('pf-name').scrollIntoView({ block: 'center' }); if (!profile().name) $('pf-name').focus(); };
   renderProfile();
   finishLogin().catch((e) => A.toast('Logowanie: ' + e.message));

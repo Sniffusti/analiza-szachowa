@@ -971,3 +971,10 @@ body.board-max .tools .icon-btn:not(#btn-max):not(#btn-flip) { display: none; }
 .max-hint { display: none; }
 .pl-king { width: 22px; height: 22px; flex: 0 0 auto; }
 #btn-arrow.on { background: var(--accent); color: #fff; }
+/* znaczki wyniku rysowane kreskami – idealnie na środku (bez przesunięć czcionki) */
+.rs { position: relative; font-size: 0; width: 18px; height: 18px; }
+.rs::before, .rs::after { content: ''; position: absolute; left: 50%; top: 50%; width: 9px; height: 2px; background: #fff; border-radius: 1px; transform: translate(-50%, -50%); }
+.rs.w::after { transform: translate(-50%, -50%) rotate(90deg); }
+.rs.l::after { display: none; }
+.rs.d::before { transform: translate(-50%, calc(-50% - 2px)); }
+.rs.d::after { transform: translate(-50%, calc(-50% + 2px)); }

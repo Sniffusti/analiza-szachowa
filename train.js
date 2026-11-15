@@ -108,6 +108,7 @@ function setSub(sub) {
   for (const b of $('train-sub').children) b.classList.toggle('active', b.dataset.sub === sub);
   for (const p of document.querySelectorAll('#tab-puzzles .train-pane')) p.hidden = p.id !== 'train-' + sub;
   A.store.set('trainSub', sub);
+  document.body.classList.toggle('pz-home', sub === 'pzhome');
   if (sub === 'pzhome') renderPzHome();
   if (sub === 'mistakes') refreshMistakesInfo();
   if (sub === 'rush') rushUi();
@@ -914,5 +915,5 @@ export function initTraining(api) {
     if (e.target.closest('[data-go="mistakes"]')) { A.showTab('puzzles'); setSub('mistakes'); nextMistake(); }
   });
   renderPzStats();
-  setSub((['pzhome', 'puzzles', 'rush', 'mistakes', 'coords'].includes(A.store.get('trainSub', 'pzhome')) ? A.store.get('trainSub', 'pzhome') : 'pzhome'));
+  setSub((['pzhome', 'puzzles', 'rush', 'mistakes'].includes(A.store.get('trainSub', 'pzhome')) ? A.store.get('trainSub', 'pzhome') : 'pzhome'));
 }

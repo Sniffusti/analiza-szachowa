@@ -1370,6 +1370,7 @@ function showTab(name) {
   $('page-title').textContent = PAGE_TITLES[name] || '';
   if (name === 'home') renderHome(HOME_API);
   store.set('lastTab', name);
+  document.body.dataset.tab = name;
   for (const b of document.querySelectorAll('.tabs button')) b.classList.toggle('active', b.dataset.tab === name);
   for (const t of document.querySelectorAll('.tab')) t.hidden = t.id !== 'tab-' + name;
   if (name === 'openings') scheduleExplorer(true);

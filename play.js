@@ -194,6 +194,7 @@ function beginGame({ mode, color, tc, oppName, oppAva, oppRating, myRating, even
   const me = A.profile().name || 'Ty';
   G.headers = { Event: event, White: color === 'w' ? me : oppName, Black: color === 'b' ? me : oppName, WhiteElo: color === 'w' ? myRating : oppRating, BlackElo: color === 'b' ? myRating : oppRating };
   $('play-setup').hidden = true; $('play-game').hidden = false; $('play-result').hidden = true;
+  document.body.classList.remove('setup-open');
   $('play-takeback').hidden = mode !== 'bot' && mode !== 'custom';
   $('play-draw').hidden = false; $('play-resign').hidden = false;
   resetChat(mode === 'online' || mode === 'lichess');
@@ -593,6 +594,7 @@ function renderOnlineRatings() {
   $('online-ratings').innerHTML = `<span class="pill accent">Bullet ${r.bullet}</span><span class="pill accent">Blitz ${r.blitz}</span><span class="pill accent">Rapid ${r.rapid}</span>`;
 }
 function showSetup() {
+  document.body.classList.add('setup-open');
   $('play-setup').hidden = false; $('play-game').hidden = true; $('play-result').hidden = true;
   if (G.chess && !G.on) { G.chess = null; A.S.train = null; A.render(); }
 }
